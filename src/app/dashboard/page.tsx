@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { events, users } from '@/lib/data';
+import { CreateEventDialog } from '@/components/create-event-dialog';
 
 export default function DashboardPage() {
   const currentUser = users[0]; // Mock current user
@@ -25,10 +26,12 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">Welcome back, {currentUser.name}!</h1>
           <p className="text-muted-foreground">Here are your ongoing events.</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Event
-        </Button>
+        <CreateEventDialog>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Event
+          </Button>
+        </CreateEventDialog>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -70,10 +73,12 @@ export default function DashboardPage() {
         ))}
          <Card className="flex h-full min-h-[280px] items-center justify-center rounded-lg border-2 border-dashed">
           <div className="text-center">
-            <Button variant="ghost">
-              <Plus className="mr-2 h-4 w-4" />
-              Create a New Event
-            </Button>
+            <CreateEventDialog>
+              <Button variant="ghost">
+                <Plus className="mr-2 h-4 w-4" />
+                Create a New Event
+              </Button>
+            </CreateEventDialog>
             <p className="mt-2 text-sm text-muted-foreground">or join an existing one.</p>
           </div>
         </Card>
