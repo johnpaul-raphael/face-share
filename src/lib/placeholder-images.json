@@ -1,3 +1,118 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-image",
+      "description": "A vibrant event with people networking",
+      "imageUrl": "https://images.unsplash.com/photo-1768508664411-9bef1b361224?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxldmVudCUyMG5ldHdvcmtpbmd8ZW58MHx8fHwxNzY5Mjk0NDk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "event networking"
+    },
+    {
+      "id": "avatar-1",
+      "description": "User avatar 1",
+      "imageUrl": "https://images.unsplash.com/photo-1521119989659-a83eee488004?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjkyODc2NjV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "avatar-2",
+      "description": "User avatar 2",
+      "imageUrl": "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxtYW4lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjkyMjQ4NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man portrait"
+    },
+    {
+      "id": "avatar-3",
+      "description": "User avatar 3",
+      "imageUrl": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3b21hbiUyMHBvcnRyYWl0fGVufDB8fHx8MTc2OTIxNzA3MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman portrait"
+    },
+    {
+      "id": "avatar-4",
+      "description": "User avatar 4",
+      "imageUrl": "https://images.unsplash.com/photo-1506277886164-e25aa3f4ef7f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxwZXJzb24lMjBzbWlsaW5nfGVufDB8fHx8MTc2OTI4MTY4Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person smiling"
+    },
+    {
+      "id": "event-cover-1",
+      "description": "Corporate conference",
+      "imageUrl": "https://images.unsplash.com/photo-1568304603980-85ff55550db2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxjb25mZXJlbmNlJTIwaGFsbHxlbnwwfHx8fDE3NjkyNzYzMjN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "conference hall"
+    },
+    {
+      "id": "event-cover-2",
+      "description": "Wedding celebration",
+      "imageUrl": "https://images.unsplash.com/photo-1647296020388-787fdae78e3c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHx3ZWRkaW5nJTIwcmVjZXB0aW9ufGVufDB8fHx8MTc2OTIwMTA2MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wedding reception"
+    },
+    {
+      "id": "event-cover-3",
+      "description": "Music festival",
+      "imageUrl": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtdXNpYyUyMGZlc3RpdmFsfGVufDB8fHx8MTc2OTI3ODA1NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "music festival"
+    },
+    {
+      "id": "gallery-photo-1",
+      "description": "Group of friends at a party",
+      "imageUrl": "https://images.unsplash.com/photo-1485872299829-c673f5194813?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxmcmllbmRzJTIwcGFydHl8ZW58MHx8fHwxNzY5Mjk0NDk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "friends party"
+    },
+    {
+      "id": "gallery-photo-2",
+      "description": "Speaker on stage at a conference",
+      "imageUrl": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxjb25mZXJlbmNlJTIwc3BlYWtlcnxlbnwwfHx8fDE3NjkyMDIwNzN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "conference speaker"
+    },
+    {
+      "id": "gallery-photo-3",
+      "description": "Couple dancing at a wedding",
+      "imageUrl": "https://images.unsplash.com/photo-1591969851586-adbbd4accf81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjb3VwbGUlMjBkYW5jaW5nfGVufDB8fHx8MTc2OTIxMjU1OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "couple dancing"
+    },
+    {
+      "id": "gallery-photo-4",
+      "description": "Crowd at a concert",
+      "imageUrl": "https://images.unsplash.com/photo-1603910234616-3b5f4a6be2b4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjb25jZXJ0JTIwY3Jvd2R8ZW58MHx8fHwxNzY5MjI2OTM5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "concert crowd"
+    },
+    {
+      "id": "gallery-photo-5",
+      "description": "People talking at a meetup",
+      "imageUrl": "https://images.unsplash.com/photo-1711239226946-23ce021df899?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxidXNpbmVzcyUyMG1lZXR1cHxlbnwwfHx8fDE3NjkyOTQ0OTh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "business meetup"
+    },
+    {
+      "id": "gallery-photo-6",
+      "description": "Family portrait at a reunion",
+      "imageUrl": "https://images.unsplash.com/photo-1581952975975-08cd95a728d4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxmYW1pbHklMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjkyMzU3NjF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "family portrait"
+    },
+    {
+      "id": "low-confidence-1",
+      "description": "Blurry photo of two people",
+      "imageUrl": "https://images.unsplash.com/photo-1525543907410-b2562b6796d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxibHVycnklMjBwZW9wbGV8ZW58MHx8fHwxNzY5Mjk0NDk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "blurry people"
+    },
+    {
+      "id": "low-confidence-2",
+      "description": "Side profile of a person in a crowd",
+      "imageUrl": "https://images.unsplash.com/photo-1697116365744-84cf1363e71a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxwZXJzb24lMjBjcm93ZHxlbnwwfHx8fDE3NjkyOTQ0OTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person crowd"
+    },
+    {
+      "id": "face-upload-1",
+      "description": "User face for profile",
+      "imageUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxmYWNlJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzY5MjczNjk4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "face portrait"
+    },
+    {
+      "id": "face-upload-2",
+      "description": "User face for profile",
+      "imageUrl": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxmYWNlJTIwcHJvZmlsZXxlbnwwfHx8fDE3NjkyOTQ0OTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "face profile"
+    },
+    {
+      "id": "face-upload-3",
+      "description": "User face for profile",
+      "imageUrl": "https://images.unsplash.com/photo-1688566842783-1fd73b4fb132?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxmYWNlJTIwc21pbGluZ3xlbnwwfHx8fDE3NjkxODUzNTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "face smiling"
+    }
+  ]
 }
