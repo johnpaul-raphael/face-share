@@ -59,9 +59,8 @@ export default function ProfilePage() {
                     <Image
                       src={image.imageUrl}
                       alt={image.description}
-                      layout="fill"
-                      objectFit="cover"
-                      className="rounded-lg"
+                      fill
+                      className="rounded-lg object-cover"
                     />
                     <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
                       <Button variant="destructive" size="icon">

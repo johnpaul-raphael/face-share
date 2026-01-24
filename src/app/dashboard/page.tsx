@@ -43,9 +43,8 @@ export default function DashboardPage() {
                   <Image
                     src={event.coverImageUrl}
                     alt={event.name}
-                    layout="fill"
-                    objectFit="cover"
-                    className="rounded-t-lg"
+                    fill
+                    className="rounded-t-lg object-cover"
                   />
                 </div>
               </CardHeader>

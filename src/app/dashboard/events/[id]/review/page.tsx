@@ -57,8 +57,8 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
                         <Image
                           src={photo.url}
                           alt={`Photo ${photo.id}`}
-                          layout="fill"
-                          objectFit="cover"
+                          fill
+                          className="object-cover"
                         />
                       </div>
                       <div className="flex items-center gap-4 rounded-lg border p-4">

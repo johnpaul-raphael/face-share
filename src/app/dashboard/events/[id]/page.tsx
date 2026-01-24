@@ -33,9 +33,8 @@ export default function EventGalleryPage({
               <Image
                 src={photo.url}
                 alt={`Photo ${photo.id}`}
-                layout="fill"
-                objectFit="cover"
-                className="transition-transform duration-300 group-hover:scale-110"
+                fill
+                className="object-cover transition-transform duration-300 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
                 <div className="absolute bottom-2 right-2">
