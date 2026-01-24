@@ -39,21 +39,27 @@ export default function DashboardLayout({
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard" tooltip="Dashboard">
-                <Home />
-                Dashboard
+              <SidebarMenuButton asChild tooltip="Dashboard">
+                <Link href="/dashboard">
+                  <Home />
+                  Dashboard
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/my-photos" tooltip="My Photos">
-                <Image />
-                My Photos
+              <SidebarMenuButton asChild tooltip="My Photos">
+                <Link href="/dashboard/my-photos">
+                  <Image />
+                  My Photos
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/profile" tooltip="Profile">
-                <User />
-                Profile
+              <SidebarMenuButton asChild tooltip="Profile">
+                <Link href="/dashboard/profile">
+                  <User />
+                  Profile
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
