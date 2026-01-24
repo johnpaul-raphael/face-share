@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { Check, Wand2, X, RefreshCw } from 'lucide-react';
+import { Check, Wand2, X, RefreshCw, ShieldCheck } from 'lucide-react';
 import {
   Card,
   CardContent,
