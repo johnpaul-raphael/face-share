@@ -1,4 +1,4 @@
-import { Upload, Trash2, Wand2 } from 'lucide-react';
+import { Upload, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { users } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Textarea } from '@/components/ui/textarea';
 
 export default function ProfilePage() {
   const currentUser = users[0];
@@ -75,14 +74,6 @@ export default function ProfilePage() {
                   </Button>
                 </div>
               </div>
-            </div>
-             <div className="space-y-4 rounded-lg border bg-accent/20 p-4">
-              <h3 className="font-semibold text-foreground">AI Prompt Generator</h3>
-              <p className="text-sm text-muted-foreground">Describe yourself, and let AI generate a detailed prompt to find the best images for your profile.</p>
-              <Textarea placeholder="e.g., A man in his 30s with short brown hair, glasses, and a beard." />
-              <Button variant="secondary">
-                <Wand2 className="mr-2 h-4 w-4" /> Generate Prompt
-              </Button>
             </div>
             <Button className="w-full">Update Face Profile</Button>
           </CardContent>
