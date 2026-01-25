@@ -83,7 +83,7 @@ export default function DashboardLayout({
           </div>
           <div className="flex items-center gap-4">
             <Button variant="outline" size="sm" asChild>
-              <Link href="#">
+              <Link href="/dashboard/events/join">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Join Event
               </Link>
