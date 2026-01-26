@@ -44,7 +44,7 @@ function JoinEventPage() {
       setEvent(null);
       setJoinCode('');
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   const findAndSetEvent = (code: string) => {
     setIsLoading(true);
@@ -77,20 +77,33 @@ function JoinEventPage() {
       return;
     }
     
+    if (event.pendingParticipantIds?.includes(currentUser.id)) {
+      toast({
+        title: 'Request Already Sent',
+        description: 'You have already requested to join this event. The owner will review it soon.',
+      });
+      return;
+    }
+
     setIsJoining(true);
     
     setTimeout(() => {
       const eventToUpdate = events.find(e => e.id === event.id);
-      if (eventToUpdate && !eventToUpdate.participantIds.includes(currentUser.id)) {
-        eventToUpdate.participantIds.push(currentUser.id);
+      if (eventToUpdate) {
+        if (!eventToUpdate.pendingParticipantIds) {
+          eventToUpdate.pendingParticipantIds = [];
+        }
+        if (!eventToUpdate.pendingParticipantIds.includes(currentUser.id)) {
+            eventToUpdate.pendingParticipantIds.push(currentUser.id);
+        }
       }
 
       toast({
-        title: 'Successfully joined event!',
-        description: `You are now a participant of "${event.name}".`,
+        title: 'Request Sent!',
+        description: `Your request to join "${event.name}" has been sent for approval.`,
       });
 
-      router.push(`/dashboard/events/${event.id}`);
+      router.push(`/dashboard`);
     }, 1000);
   };
   
@@ -104,6 +117,14 @@ function JoinEventPage() {
 
   if (event) {
     const isAlreadyParticipant = event.participantIds.includes(currentUser.id);
+    const hasRequested = event.pendingParticipantIds?.includes(currentUser.id);
+
+    const getButtonText = () => {
+        if (isAlreadyParticipant) return 'Go to Event';
+        if (hasRequested) return 'Request Sent';
+        return 'Request to Join Event';
+    }
+
     return (
        <div className="flex w-full items-center justify-center">
         <div className="w-full max-w-md">
@@ -121,9 +142,9 @@ function JoinEventPage() {
                     </p>
                 </CardContent>
                 <CardFooter className="flex-col items-stretch gap-4 p-4">
-                <Button onClick={handleJoinOrGoToEvent} disabled={isJoining}>
+                <Button onClick={handleJoinOrGoToEvent} disabled={isJoining || hasRequested}>
                     {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isAlreadyParticipant ? 'Go to Event' : 'Accept & Join Event'}
+                    {getButtonText()}
                 </Button>
                 <Button variant="ghost" onClick={() => router.push('/dashboard/events/join')}>
                     Try a different code

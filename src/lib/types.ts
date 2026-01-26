@@ -11,6 +11,7 @@ export type Event = {
   description: string;
   ownerId: string;
   participantIds: string[];
+  pendingParticipantIds?: string[];
   coverImageUrl: string;
   joinCode: string;
   newPhotosCount?: number;
