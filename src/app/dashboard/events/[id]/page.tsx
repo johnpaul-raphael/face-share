@@ -25,6 +25,11 @@ export default function EventGalleryPage() {
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const prevUploadingFilesRef = useRef<UploadingFile[]>([]);
+
+  useEffect(() => {
+    prevUploadingFilesRef.current = uploadingFiles;
+  });
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -43,6 +48,18 @@ export default function EventGalleryPage() {
   }
 
   useEffect(() => {
+    // This effect is for showing the toast *after* the state has updated.
+    const previouslyUploading = prevUploadingFilesRef.current;
+    uploadingFiles.forEach(file => {
+      const prevFile = previouslyUploading.find(f => f.id === file.id);
+      if (file.progress >= 100 && (!prevFile || prevFile.progress < 100)) {
+        toast({ title: "Upload complete!", description: `${file.file.name} has been uploaded.` });
+      }
+    });
+  }, [uploadingFiles, toast]);
+
+  useEffect(() => {
+    // This effect manages the timers for upload progress simulation.
     if (uploadingFiles.length > 0) {
       const timers = uploadingFiles
         .filter(f => f.progress < 100)
@@ -55,7 +72,6 @@ export default function EventGalleryPage() {
                   if (newProgress >= 100) {
                      clearInterval(timer);
                      // In a real app, you'd add the photo to the main list here
-                     toast({ title: "Upload complete!", description: `${file.file.name} has been uploaded.` });
                      return { ...f, progress: 100 };
                   }
                   return { ...f, progress: newProgress };
@@ -71,7 +87,7 @@ export default function EventGalleryPage() {
         timers.forEach(clearInterval);
       };
     }
-  }, [uploadingFiles, toast]);
+  }, [uploadingFiles]);
   
   const removeFileFromQueue = (id: string) => {
       setUploadingFiles(prev => prev.filter(f => f.id !== id));
