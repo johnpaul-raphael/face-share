@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Photo } from '@/lib/types';
+import { useParams } from 'next/navigation';
 
 
 interface UploadingFile {
@@ -18,11 +19,8 @@ interface UploadingFile {
     source: "file" | "url"
 }
 
-export default function EventGalleryPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function EventGalleryPage() {
+  const params = useParams();
   const eventPhotos = photos.filter((p) => p.eventId === params.id);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);

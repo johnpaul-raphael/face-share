@@ -24,6 +24,7 @@ import { photos, users } from '@/lib/data';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Photo, User } from '@/lib/types';
+import { useParams } from 'next/navigation';
 
 
 function ReviewCard({ photo, matchIndex }: { photo: Photo; matchIndex: number }) {
@@ -144,7 +145,8 @@ function ReviewCard({ photo, matchIndex }: { photo: Photo; matchIndex: number })
 }
 
 
-export default function ReviewPage({ params }: { params: { id: string } }) {
+export default function ReviewPage() {
+  const params = useParams();
   const lowConfidencePhotos = photos.filter(
     (p) =>
       p.eventId === params.id &&
