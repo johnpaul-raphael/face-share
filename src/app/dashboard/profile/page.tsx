@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, ChangeEvent } from 'react';
-import { Upload, Trash2 } from 'lucide-react';
+import { Upload, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { users } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type FaceImage = {
   id: string;
@@ -36,6 +38,7 @@ export default function ProfilePage() {
 
   const [faceImages, setFaceImages] = useState<FaceImage[]>(initialFaceImages);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasConsented, setHasConsented] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -81,6 +84,21 @@ export default function ProfilePage() {
     }, 2000);
   };
 
+  const profileStatus =
+    faceImages.length >= 3
+      ? {
+          variant: 'default',
+          title: 'Profile Active',
+          description: 'Your face profile is ready for automatic tagging.',
+          icon: ShieldCheck,
+        }
+      : {
+          variant: 'destructive',
+          title: 'Needs More Photos',
+          description: `Please upload at least ${3 - faceImages.length} more photo(s).`,
+          icon: AlertTriangle,
+        };
+
   return (
     <div className="grid gap-6 md:grid-cols-3">
       <div className="md:col-span-1">
@@ -112,6 +130,11 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <Alert variant={profileStatus.variant as 'default' | 'destructive'}>
+                <profileStatus.icon className="h-4 w-4" />
+                <AlertTitle>{profileStatus.title}</AlertTitle>
+                <AlertDescription>{profileStatus.description}</AlertDescription>
+            </Alert>
             <div>
               <Label className="mb-2 block">Your Face Profile Images</Label>
               <div className="grid grid-cols-3 gap-4 md:grid-cols-5">
@@ -154,10 +177,21 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox id="terms" checked={hasConsented} onCheckedChange={(checked) => setHasConsented(checked as boolean)} />
+              <label
+                htmlFor="terms"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                I consent to the use of my photos for facial recognition.
+              </label>
+            </div>
+
             <Button
               className="w-full"
               onClick={handleUpdateProfile}
-              disabled={isUploading}
+              disabled={isUploading || !hasConsented || faceImages.length < 3}
             >
               {isUploading ? 'Updating...' : 'Update Face Profile'}
             </Button>

@@ -13,6 +13,7 @@ export type Event = {
   participantIds: string[];
   coverImageUrl: string;
   joinCode: string;
+  newPhotosCount?: number;
 };
 
 export type Photo = {
@@ -22,6 +23,7 @@ export type Photo = {
   url: string;
   uploadedAt: string;
   matches: FaceMatch[];
+  isProcessing?: boolean;
 };
 
 export type FaceMatch = {

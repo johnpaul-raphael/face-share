@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/card';
 import { events, users } from '@/lib/data';
 import { CreateEventDialog } from '@/components/create-event-dialog';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const currentUser = users[0]; // Mock current user
@@ -38,7 +39,7 @@ export default function DashboardPage() {
         {userEvents.map((event) => (
           <Link key={event.id} href={`/dashboard/events/${event.id}`}>
             <Card className="flex h-full transform flex-col transition-transform duration-300 hover:scale-105 hover:shadow-xl">
-              <CardHeader className="p-0">
+              <CardHeader className="relative p-0">
                 <div className="relative h-48 w-full">
                   <Image
                     src={event.coverImageUrl}
@@ -46,6 +47,11 @@ export default function DashboardPage() {
                     fill
                     className="rounded-t-lg object-cover"
                   />
+                   {event.newPhotosCount && event.newPhotosCount > 0 && (
+                     <Badge variant="destructive" className="absolute right-2 top-2">
+                        <Bell className="mr-1 h-3 w-3" /> {event.newPhotosCount} New
+                     </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 p-4">
@@ -61,9 +67,7 @@ export default function DashboardPage() {
                     <span>{event.participantIds.length} participants</span>
                   </div>
                   {event.ownerId === currentUser.id && (
-                    <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                      Owner
-                    </span>
+                    <Badge variant="outline">Owner</Badge>
                   )}
                 </div>
               </CardFooter>

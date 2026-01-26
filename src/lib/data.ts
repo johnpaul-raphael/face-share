@@ -18,7 +18,8 @@ export const events: Event[] = [
     ownerId: 'user-1',
     participantIds: ['user-1', 'user-2', 'user-3'],
     coverImageUrl: findImage('event-cover-1'),
-    joinCode: 'INNO24'
+    joinCode: 'INNO24',
+    newPhotosCount: 5,
   },
   {
     id: 'event-2',
@@ -36,7 +37,8 @@ export const events: Event[] = [
     ownerId: 'user-2',
     participantIds: ['user-1', 'user-2', 'user-3', 'user-4'],
     coverImageUrl: findImage('event-cover-3'),
-    joinCode: 'SUMMER24'
+    joinCode: 'SUMMER24',
+    newPhotosCount: 2,
   },
 ];
 
@@ -61,6 +63,7 @@ export const photos: Photo[] = [
     matches: [
       { photoId: 'photo-2', userId: 'user-1', confidence: 0.99, isConfirmed: true, faceImageUrl: findImage('avatar-1') },
     ],
+    isProcessing: true,
   },
   {
     id: 'photo-3',

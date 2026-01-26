@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,7 +44,7 @@ function JoinEventPage() {
       setEvent(null);
       setJoinCode('');
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const findAndSetEvent = (code: string) => {
     setIsLoading(true);
@@ -106,17 +107,20 @@ function JoinEventPage() {
     return (
        <div className="flex w-full items-center justify-center">
         <div className="w-full max-w-md">
-            <Card>
+            <Card className="overflow-hidden">
+                <div className="relative h-48 w-full">
+                    <Image src={event.coverImageUrl} alt={event.name} fill className="object-cover" />
+                </div>
                 <CardHeader>
-                <CardTitle>{event.name}</CardTitle>
-                <CardDescription>{event.description}</CardDescription>
+                  <CardTitle>{event.name}</CardTitle>
+                  <CardDescription>{event.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground">
                         You've been invited by <span className="font-semibold">{users.find(u => u.id === event.ownerId)?.name || 'the event owner'}</span> to join this event.
                     </p>
                 </CardContent>
-                <CardFooter className="flex-col items-stretch gap-4">
+                <CardFooter className="flex-col items-stretch gap-4 p-4">
                 <Button onClick={handleJoinOrGoToEvent} disabled={isJoining}>
                     {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isAlreadyParticipant ? 'Go to Event' : 'Accept & Join Event'}
