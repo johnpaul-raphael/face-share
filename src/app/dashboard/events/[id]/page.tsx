@@ -39,48 +39,54 @@ export default function EventGalleryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
+  // Effect to simulate upload progress
   useEffect(() => {
-    // This effect manages the upload simulation and moves files to the staging area.
-    if (uploadingFiles.length === 0) return;
+    const filesInProgress = uploadingFiles.filter(f => f.progress < 100);
+    if (filesInProgress.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setUploadingFiles(prevFiles => 
+        prevFiles.map(file => {
+          if (file.progress >= 100) return file;
+          const newProgress = Math.min(100, file.progress + Math.random() * 30);
+          return { ...file, progress: newProgress };
+        })
+      );
+    }, 500);
 
-    const timers = uploadingFiles
-      .filter(f => f.progress < 100)
-      .map(file => {
-        const timer = setInterval(() => {
-          setUploadingFiles(prevFiles => {
-            const currentFile = prevFiles.find(f => f.id === file.id);
-            if (!currentFile || currentFile.progress >= 100) {
-              clearInterval(timer);
-              return prevFiles;
-            }
+    return () => clearInterval(interval);
+  }, [uploadingFiles]);
 
-            const newProgress = currentFile.progress + Math.random() * 30;
+  // Effect to handle completed uploads
+  useEffect(() => {
+    const newlyCompletedFiles = uploadingFiles.filter(f => f.progress >= 100);
 
-            if (newProgress >= 100) {
-              clearInterval(timer);
-              
-              const newStagedPhoto = { id: currentFile.id, file: currentFile.file, url: URL.createObjectURL(currentFile.file) };
-              setStagedPhotos(prevStaged => [...prevStaged, newStagedPhoto]);
-              
-              toast({ title: "Ready for review", description: `${currentFile.file.name} is uploaded.` });
-              
-              return prevFiles.filter(f => f.id !== currentFile.id);
-            }
-            
-            return prevFiles.map(f => f.id === currentFile.id ? { ...f, progress: newProgress } : f);
-          });
-        }, 500);
-        return timer;
+    if (newlyCompletedFiles.length > 0) {
+      const newStagedPhotos = newlyCompletedFiles.map(file => ({
+        id: file.id,
+        file: file.file,
+        url: URL.createObjectURL(file.file),
+      }));
+
+      setStagedPhotos(prevStaged => [...prevStaged, ...newStagedPhotos]);
+
+      newlyCompletedFiles.forEach(file => {
+        toast({ title: "Ready for review", description: `${file.file.name} is uploaded.` });
       });
 
-    return () => timers.forEach(clearInterval);
-  }, [uploadingFiles, toast]);
+      setUploadingFiles(prevUploading => prevUploading.filter(f => f.progress < 100));
+    }
+  // We are intentionally not including toast in the dependency array to avoid issues.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadingFiles]);
   
   // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
         stagedPhotos.forEach(p => URL.revokeObjectURL(p.url));
     }
+    // This effect should only run once on unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addFilesToUploadQueue = (files: File[]) => {
