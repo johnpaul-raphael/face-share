@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { Upload, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,8 @@ import { users } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { apiClient } from '@/lib/api';
+import type { User } from '@/lib/types';
 
 type FaceImage = {
   id: string;
@@ -27,7 +29,7 @@ type FaceImage = {
 };
 
 export default function ProfilePage() {
-  const currentUser = users[0];
+
   const initialFaceImages = PlaceHolderImages.filter((img) =>
     img.id.startsWith('face-upload')
   ).map((img) => ({
@@ -36,11 +38,53 @@ export default function ProfilePage() {
     description: img.description,
   }));
 
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [faceImages, setFaceImages] = useState<FaceImage[]>(initialFaceImages);
   const [isUploading, setIsUploading] = useState(false);
   const [hasConsented, setHasConsented] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  // Get current user (once on mount)
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    const fetchUser = async () => {
+      try {
+        const userData = await apiClient.getCurrentUser();
+        if (!cancelled) setCurrentUser(userData);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    fetchUser();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Update profile
+  const updateEmailAndName = async () => {
+    if (!currentUser) return;
+    setIsLoading(true);
+    try {
+      const userData = await apiClient.updateProfile(currentUser);
+      setCurrentUser(userData);
+      toast({
+        title: 'Profile Updated!',
+        description: 'Your email and name have been successfully updated.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update your email and name.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -110,13 +154,24 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" defaultValue={currentUser.name} />
+              <Input
+                id="name"
+                value={currentUser?.name ?? ''}
+                disabled={isLoading}
+                onChange={(e) => setCurrentUser((prev) => prev ? { ...prev, name: e.target.value } : null)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue={currentUser.email} />
+              <Input
+                id="email"
+                type="email"
+                value={currentUser?.email ?? ''}
+                disabled={isLoading}
+                onChange={(e) => setCurrentUser((prev) => prev ? { ...prev, email: e.target.value } : null)}
+              />
             </div>
-            <Button className="w-full">Save Changes</Button>
+            <Button className="w-full" onClick={updateEmailAndName}>Save Changes</Button>
           </CardContent>
         </Card>
       </div>

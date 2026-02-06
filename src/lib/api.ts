@@ -1,3 +1,5 @@
+import { User } from "./types";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export interface ApiError {
@@ -73,10 +75,36 @@ export class ApiClient {
     return result;
   }
 
-  async getCurrentUser() {
-    return this.request<{ id: string; email: string; name: string; avatar_url?: string }>(
+  async getCurrentUser(): Promise<User> {
+    const raw = await this.request<{ id: string; email: string; name: string; avatar_url?: string }>(
       '/auth/me'
     );
+    return {
+      id: raw.id,
+      name: raw.name,
+      email: raw.email,
+      ...(raw.avatar_url != null && { avatarUrl: raw.avatar_url }),
+    };
+  }
+
+  async updateProfile(data: User): Promise<User> {
+    const raw = await this.request<{ id: string; email: string; name: string; avatar_url?: string }>(
+      '/users/me',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          ...(data.avatarUrl != null && { avatar_url: data.avatarUrl }),
+        }),
+      }
+    );
+    return {
+      id: raw.id,
+      name: raw.name,
+      email: raw.email,
+      ...(raw.avatar_url != null && { avatarUrl: raw.avatar_url }),
+    };
   }
 }
 

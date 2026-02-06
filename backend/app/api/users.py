@@ -21,7 +21,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user profile."""
     return current_user
 
-
+# Update current user profile
 @router.patch("/me", response_model=UserResponse)
 async def update_me(
     user_update: UserUpdate,

@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     S3_PRESIGNED_URL_EXPIRATION: int = 3600  # 1 hour
     
     # CORS - stored as string in env, converted to list
-    CORS_ORIGINS: Any = "http://localhost:3000,http://localhost:9002"
+    CORS_ORIGINS: Any = "http://localhost:9002"
     
     @model_validator(mode='after')
     def parse_cors_origins(self):
