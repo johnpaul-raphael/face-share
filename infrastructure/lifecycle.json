@@ -1,0 +1,17 @@
+{
+    "Rules": [
+        {
+            "ID": "DeleteEventPhotosAfter30Days",
+            "Status": "Enabled",
+            "Filter": {
+                "Prefix": "events/"
+            },
+            "Expiration": {
+                "Days": 30
+            },
+            "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7
+            }
+        }
+    ]
+}

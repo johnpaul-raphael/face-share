@@ -1,54 +1,248 @@
+"""
+FaceShare API Configuration Module
+
+This module handles loading configuration from environment files.
+Supports multiple environments: development, qa, production
+
+Usage:
+    from app.core.config import settings
+    
+    # Access configuration
+    db_url = settings.DATABASE_URL
+    
+    # Check environment
+    if settings.is_development:
+        print("Running in development mode")
+    
+Environment Files:
+    - .env          : Local development (default)
+    - .env.dev      : Shared development
+    - .env.qa       : QA/Staging environment
+    - .env.prod     : Production environment
+    - .env.example  : Template (safe to commit)
+
+Switching Environments:
+    1. Set ENVIRONMENT variable:
+       $env:ENVIRONMENT="qa"  # PowerShell
+       export ENVIRONMENT=qa   # Linux/Mac
+    
+    2. Or specify file directly:
+       $env:ENV_FILE=".env.qa"
+    
+Security:
+    - NEVER commit .env files with real credentials
+    - .env files are listed in .gitignore
+    - Use .env.example as a template
+"""
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List, Any
 from pydantic import model_validator
 import json
+import os
 
 
 class Settings(BaseSettings):
-    # App
+    """
+    Application settings loaded from environment files.
+    
+    Attributes are loaded from .env file (or specified env file).
+    Type hints ensure proper validation.
+    """
+    
+    # ==========================================
+    # ENVIRONMENT SETTINGS
+    # ==========================================
+    ENVIRONMENT: str = "development"
+    """Current environment: development, qa, or production"""
+    
+    # ==========================================
+    # APPLICATION SETTINGS
+    # ==========================================
     PROJECT_NAME: str = "FaceShare API"
+    """API project name used in documentation"""
+    
     VERSION: str = "1.0.0"
+    """API version number"""
+    
     API_V1_STR: str = "/api/v1"
+    """Base path for API routes"""
     
-    # Security
-    SECRET_KEY: str = "your-secret-key-change-in-production-use-openssl-rand-hex-32"
+    # ==========================================
+    # SECURITY SETTINGS
+    # ==========================================
+    SECRET_KEY: str = "change-this-in-production"
+    """
+    JWT signing secret.
+    Generate with: openssl rand -hex 32
+    """
+    
     ALGORITHM: str = "HS256"
+    """JWT encryption algorithm"""
+    
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    """How long access tokens are valid (minutes)"""
+    
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    """How long refresh tokens are valid (days)"""
     
-    # Database
+    # ==========================================
+    # DATABASE SETTINGS
+    # ==========================================
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/faceshare"
+    """
+    Database connection string.
+    Examples:
+        SQLite:     sqlite:///./app.db
+        PostgreSQL: postgresql://user:pass@localhost/dbname
+        AWS RDS:    postgresql://user:pass@host.region.rds.amazonaws.com:5432/db
+    """
     
-    # AWS S3
+    # ==========================================
+    # AWS SETTINGS
+    # ==========================================
     AWS_ACCESS_KEY_ID: Optional[str] = None
+    """AWS IAM access key (from AWS Console)"""
+    
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
-    AWS_REGION: str = "us-east-1"
-    S3_BUCKET_NAME: str = "faceshare-uploads"
+    """AWS IAM secret key (keep secure!)"""
+    
+    AWS_REGION: str = None
+    """AWS region for all services (S3, Rekognition, etc.)"""
+    
+    S3_BUCKET_NAME: str = None
+    """
+    S3 bucket name for storing images.
+    Must be globally unique across all AWS accounts.
+    """
+    
     S3_PRESIGNED_URL_EXPIRATION: int = 3600  # 1 hour
+    """How long presigned URLs are valid (seconds)"""
     
-    # CORS - stored as string in env, converted to list
-    CORS_ORIGINS: Any = "http://localhost:9002"
+    # ==========================================
+    # CORS SETTINGS
+    # ==========================================
+    CORS_ORIGINS: Any = "http://localhost:3000"
+    """
+    Allowed origins for CORS (cross-origin requests).
+    Can be:
+        - Single URL: "http://localhost:3000"
+        - Comma-separated: "http://localhost:3000,https://app.com"
+        - JSON array: '["http://localhost:3000", "https://app.com"]'
+    """
     
+    # ==========================================
+    # PYDANTIC CONFIGURATION
+    # ==========================================
+    model_config = SettingsConfigDict(
+        env_file=".env",           # Default env file to load
+        env_file_encoding='utf-8', # File encoding
+        case_sensitive=True,       # Variable names are case-sensitive
+        extra='ignore'             # Ignore extra variables in .env
+    )
+    
+    # ==========================================
+    # VALIDATORS
+    # ==========================================
     @model_validator(mode='after')
     def parse_cors_origins(self):
-        """Convert CORS_ORIGINS string to list after model is created."""
+        """
+        Convert CORS_ORIGINS from string to list.
+        Handles multiple formats: comma-separated or JSON array.
+        """
         if isinstance(self.CORS_ORIGINS, str):
             v = self.CORS_ORIGINS.strip()
-            # Try to parse as JSON first
+            # Try JSON array format first: ["url1", "url2"]
             if v.startswith('['):
                 try:
                     self.CORS_ORIGINS = json.loads(v)
                     return self
                 except json.JSONDecodeError:
                     pass
-            # Otherwise split by comma
-            self.CORS_ORIGINS = [origin.strip() for origin in v.split(',') if origin.strip()]
+            # Fall back to comma-separated: url1,url2
+            self.CORS_ORIGINS = [
+                origin.strip() 
+                for origin in v.split(',') 
+                if origin.strip()
+            ]
         return self
     
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-    )
+    # ==========================================
+    # HELPER PROPERTIES
+    # ==========================================
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development environment"""
+        return self.ENVIRONMENT.lower() == "development"
+    
+    @property
+    def is_qa(self) -> bool:
+        """Check if running in QA/staging environment"""
+        return self.ENVIRONMENT.lower() == "qa"
+    
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production environment"""
+        return self.ENVIRONMENT.lower() == "production"
+    
+    @property
+    def is_local_database(self) -> bool:
+        """Check if using local database (SQLite or local PostgreSQL)"""
+        return "localhost" in self.DATABASE_URL or "sqlite" in self.DATABASE_URL
 
 
-settings = Settings()
+def get_environment_file() -> str:
+    """
+    Determine which .env file to load based on environment.
+    
+    Priority:
+        1. ENV_FILE environment variable (explicit file path)
+        2. ENVIRONMENT variable (maps to .env.{environment})
+        3. Default to .env (local development)
+    
+    Returns:
+        str: Path to the environment file to load
+    """
+    # Check if explicit file specified
+    if os.getenv("ENV_FILE"):
+        env_file = os.getenv("ENV_FILE")
+        print(f"📄 Using explicit env file: {env_file}")
+        return env_file
+    
+    # Check environment name
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    
+    if env == "qa":
+        print(f"🧪 Loading QA environment from .env.qa")
+        return ".env.qa"
+    elif env == "production" or env == "prod":
+        print(f"🚀 Loading Production environment from .env.prod")
+        return ".env.prod"
+    elif env == "development" or env == "dev":
+        print(f"🛠️  Loading Development environment from .env")
+        return ".env"
+    else:
+        print(f"⚠️  Unknown environment '{env}', using default .env")
+        return ".env"
+
+
+# ==========================================
+# LOAD SETTINGS
+# ==========================================
+
+# Determine which environment file to use
+_env_file = get_environment_file()
+
+# Create settings instance with selected environment
+settings = Settings(_env_file=_env_file)
+
+# Print configuration summary (remove in production if desired)
+print(f"\n{'='*50}")
+print(f"🔧 FaceShare API Configuration")
+print(f"{'='*50}")
+print(f"Environment:    {settings.ENVIRONMENT}")
+print(f"S3 Bucket:      {settings.S3_BUCKET_NAME}")
+print(f"AWS Region:     {settings.AWS_REGION}")
+print(f"Database:       {'Local' if settings.is_local_database else 'Remote'}")
+print(f"API Base Path:  {settings.API_V1_STR}")
+print(f"{'='*50}\n")

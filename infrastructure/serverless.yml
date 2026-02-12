@@ -1,0 +1,132 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: faceshare-lambda
+
+provider:
+  name: aws
+  runtime: python3.11
+  stage: ${opt:stage, 'dev'}
+  region: us-east-1
+  memorySize: 128
+  timeout: 30
+  environment:
+    DYNAMODB_TABLE: FaceShareData
+    REKOGNITION_COLLECTION: faceshare-collection
+    S3_BUCKET: faceshare-events
+    SQS_QUEUE_URL: !Ref PhotoProcessingQueue
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource: "arn:aws:s3:::faceshare-events/*"
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+          Resource: "arn:aws:dynamodb:us-east-1:*:table/FaceShareData"
+        - Effect: Allow
+          Action:
+            - rekognition:IndexFaces
+            - rekognition:SearchFacesByImage
+            - rekognition:DetectFaces
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+          Resource: !GetAtt PhotoProcessingQueue.Arn
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: false
+    slim: true
+
+package:
+  individually: true
+  exclude:
+    - node_modules/**
+    - .git/**
+    - .gitignore
+    - README.md
+
+functions:
+  # API: Index face (profile photo)
+  indexFace:
+    handler: lambda/index_face.lambda_handler
+    memorySize: 256
+    timeout: 10
+    events:
+      - httpApi:
+          path: /faces/index
+          method: post
+
+  # Trigger: Queue photo on S3 upload
+  queuePhoto:
+    handler: lambda/queue_photo.lambda_handler
+    memorySize: 128
+    timeout: 5
+    events:
+      - s3:
+          bucket: faceshare-events
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: events/
+            - suffix: .jpg
+
+  # Worker: Process photos from queue
+  processPhoto:
+    handler: lambda/process_photo.lambda_handler
+    memorySize: 512
+    timeout: 60
+    events:
+      - sqs:
+          arn: !GetAtt PhotoProcessingQueue.Arn
+          batchSize: 10
+          maximumBatchingWindowInSeconds: 5
+
+resources:
+  Resources:
+    PhotoProcessingQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: faceshare-processing-queue-${self:provider.stage}
+        VisibilityTimeout: 300
+        MessageRetentionPeriod: 86400
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt PhotoProcessingDLQ.Arn
+          maxReceiveCount: 3
+    
+    PhotoProcessingDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: faceshare-processing-dlq-${self:provider.stage}
+
+  Outputs:
+    ApiEndpoint:
+      Description: API Gateway endpoint
+      Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/'
+    
+    ProcessingQueueUrl:
+      Description: SQS Queue URL
+      Value: !Ref PhotoProcessingQueue
