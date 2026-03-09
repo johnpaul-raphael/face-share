@@ -1,7 +1,7 @@
 import secrets
 import string
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from uuid import uuid4
 from datetime import datetime, timezone
 

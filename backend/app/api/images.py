@@ -1,4 +1,5 @@
 import logging
+from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException
 from app.schemas.image import (
     PresignedUploadRequest, PresignedUploadResponse,

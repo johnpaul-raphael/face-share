@@ -18,7 +18,7 @@ export default function MyPhotosPage() {
       .then(setGroups)
       .catch(() => toast({ variant: 'destructive', title: 'Failed to load photos' }))
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [toast]);
 
   const downloadImage = async (url: string, name: string) => {
     try {
@@ -72,6 +72,7 @@ export default function MyPhotosPage() {
                   <Card key={photo.photo_id} className="group overflow-hidden">
                     <CardContent className="relative h-64 w-full p-0">
                       {photo.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={photo.url}
                           alt={`Photo from ${group.event_name}`}

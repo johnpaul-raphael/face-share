@@ -48,7 +48,7 @@ export default function ParticipantsPage() {
       }
     };
     load();
-  }, [eventId]);
+  }, [eventId, toast]);
 
   const handleRemove = async (userId: string, userName: string) => {
     try {

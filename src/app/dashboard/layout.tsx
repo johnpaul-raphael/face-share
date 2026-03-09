@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   Home,
-  Image,
+  Image as ImageIcon,
   User,
   PanelLeft,
   Settings,
@@ -49,7 +49,7 @@ export default function DashboardLayout({
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="My Photos">
                 <Link href="/dashboard/my-photos">
-                  <Image />
+                  <ImageIcon />
                   My Photos
                 </Link>
               </SidebarMenuButton>

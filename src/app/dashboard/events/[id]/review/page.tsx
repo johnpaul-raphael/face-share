@@ -29,7 +29,7 @@ export default function ReviewPage() {
       .then((all) => setPhotos(all.filter((p) => !p.is_processing && p.match_count === 0)))
       .catch(() => toast({ variant: 'destructive', title: 'Failed to load photos' }))
       .finally(() => setIsLoading(false));
-  }, [eventId]);
+  }, [eventId, toast]);
 
   if (isLoading) {
     return (
@@ -84,6 +84,7 @@ function UnmatchedPhotoCard({ photo }: { photo: PhotoResponse }) {
       <CardContent>
         {photo.url ? (
           <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photo.url}
               alt={`Photo ${photo.photo_id}`}

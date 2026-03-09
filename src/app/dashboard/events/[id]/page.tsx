@@ -42,7 +42,11 @@ export default function EventGalleryPage() {
   const [coverImageUrl, setCoverImageUrl] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stagedPhotosRef = useRef(stagedPhotos);
   const { toast } = useToast();
+
+  // Keep ref in sync so the cleanup effect always has the latest list
+  stagedPhotosRef.current = stagedPhotos;
 
   useEffect(() => {
     const load = async () => {
@@ -70,12 +74,12 @@ export default function EventGalleryPage() {
         .catch(() => toast({ variant: 'destructive', title: 'Failed to load photos' }));
     };
     load();
-  }, [eventId]);
+  }, [eventId, toast]);
 
   // Cleanup local blob URLs on unmount
   useEffect(() => {
     return () => {
-      stagedPhotos.forEach((p) => URL.revokeObjectURL(p.localUrl));
+      stagedPhotosRef.current.forEach((p) => URL.revokeObjectURL(p.localUrl));
     };
   }, []);
 
@@ -202,6 +206,7 @@ export default function EventGalleryPage() {
           <DialogHeader><DialogTitle>Photo Preview</DialogTitle></DialogHeader>
           {viewingUrl && (
             <div className="relative mt-4 h-[70vh] w-full flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={viewingUrl} alt="Full size preview" className="max-h-full max-w-full object-contain" />
             </div>
           )}
@@ -272,6 +277,7 @@ export default function EventGalleryPage() {
             {stagedPhotos.map((photo) => (
               <Card key={photo.id} className="group overflow-hidden">
                 <CardContent className="relative aspect-square w-full p-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={photo.localUrl} alt="staged" className="h-full w-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 flex items-center justify-center gap-2">
                     <Button size="icon" variant="secondary" onClick={() => setViewingUrl(photo.localUrl)}>
@@ -297,6 +303,7 @@ export default function EventGalleryPage() {
       {/* Cover photo banner — owner only */}
       {isOwner && coverImageUrl && (
         <div className="relative overflow-hidden rounded-lg border">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={coverImageUrl} alt="Event cover" className="h-48 w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <div className="absolute bottom-3 left-3 flex items-center gap-2 text-white">
@@ -328,6 +335,7 @@ export default function EventGalleryPage() {
             <Card key={photo.photo_id} className={cn('group overflow-hidden', isCover && 'ring-2 ring-yellow-400')}>
               <CardContent className="relative h-64 w-full p-0">
                 {photo.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={photo.url}
                     alt={`Photo ${photo.photo_id}`}

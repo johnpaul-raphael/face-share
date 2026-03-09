@@ -49,6 +49,7 @@ export default function DashboardPage() {
                 <CardHeader className="relative p-0">
                   <div className="relative h-48 w-full bg-muted flex items-center justify-center rounded-t-lg">
                     {event.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={event.cover_image_url}
                         alt={event.name}
