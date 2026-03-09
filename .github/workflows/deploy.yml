@@ -81,7 +81,7 @@ jobs:
         run: npm install
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Type check
         run: npm run typecheck
