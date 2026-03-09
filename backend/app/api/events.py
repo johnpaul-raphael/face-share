@@ -1,5 +1,6 @@
 import secrets
 import string
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import uuid4
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from app.schemas.event import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _JOIN_CODE_CHARS = string.ascii_uppercase + string.digits
 
@@ -220,7 +222,7 @@ async def join_event(
                 backfilled += 1
 
     if backfilled:
-        print(f"[join-event] Backfilled {backfilled} photo matches for late joiner {current_user.id}")
+        logger.info("[join-event] Backfilled %d photo matches for late joiner %s", backfilled, current_user.id)
 
     participants = dynamodb_service.get_event_participants(event_id)
     event_response = _event_item_to_response(event, participant_count=len(participants))

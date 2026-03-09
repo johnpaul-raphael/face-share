@@ -22,7 +22,9 @@ export function UserNav() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    apiClient.getCurrentUser().then(setUser).catch(() => {});
+    apiClient.getCurrentUser().then(setUser).catch(() => {
+      // User not authenticated — nav renders with empty state
+    });
   }, []);
 
   const handleLogout = () => {

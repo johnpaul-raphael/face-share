@@ -4,6 +4,7 @@ DynamoDB Service for FaceShare
 Handles all DynamoDB operations with proper error handling and logging.
 """
 
+import logging
 import boto3
 from botocore.exceptions import ClientError
 from typing import Optional, List, Dict, Any
@@ -13,43 +14,45 @@ import json
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 class DynamoDBService:
     """
     Service class for DynamoDB operations.
-    
+
     Provides methods for CRUD operations on FaceShare entities.
     """
-    
+
     def __init__(self):
         """Initialize DynamoDB client and table reference."""
         self.client = boto3.client('dynamodb', region_name=settings.AWS_REGION)
         self.table_name = settings.AWS_DYNAMODB_TABLE_NAME
         self.resource = boto3.resource('dynamodb', region_name=settings.AWS_REGION)
         self.table = self.resource.Table(self.table_name)
-    
+
     # ==========================================
     # USER OPERATIONS
     # ==========================================
-    
-    def create_user(self, user_id: str, email: str, name: str, 
+
+    def create_user(self, user_id: str, email: str, name: str,
                     hashed_password: str = None, **kwargs) -> bool:
         """
         Create a new user in DynamoDB.
-        
+
         Args:
             user_id: UUID of the user
             email: User's email address
             name: User's full name
             hashed_password: Bcrypt hashed password
             **kwargs: Additional user attributes
-        
+
         Returns:
             True if successful, False otherwise
         """
         try:
             now = datetime.now(timezone.utc).isoformat()
-            
+
             item = {
                 'PK': f'USER#{user_id}',
                 'SK': 'PROFILE',
@@ -64,18 +67,18 @@ class DynamoDBService:
                 'updated_at': now,
                 **kwargs
             }
-            
+
             # Remove None values (but keep empty strings and False)
             item = {k: v for k, v in item.items() if v is not None}
-            
+
             self.table.put_item(Item=item)
-            print(f"[db] Created user: {user_id}")
+            logger.info("[db] Created user: %s", user_id)
             return True
-            
+
         except ClientError as e:
-            print(f"[db] Error creating user: {e}")
+            logger.error("[db] Error creating user: %s", e)
             return False
-    
+
     def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """Get user by ID."""
         try:
@@ -87,9 +90,9 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"[db] Error getting user: {e}")
+            logger.error("[db] Error getting user: %s", e)
             return None
-    
+
     def get_user_by_email(self, email: str) -> Optional[Dict]:
         """Get user by email using GSI."""
         try:
@@ -104,20 +107,20 @@ class DynamoDBService:
             items = response.get('Items', [])
             return items[0] if items else None
         except ClientError as e:
-            print(f"[db] Error getting user by email: {e}")
+            logger.error("[db] Error getting user by email: %s", e)
             return None
-    
+
     # ==========================================
     # FACE PROFILE OPERATIONS
     # ==========================================
-    
-    def create_face_profile(self, user_id: str, image_id: str, 
+
+    def create_face_profile(self, user_id: str, image_id: str,
                            s3_key: str, embedding: List[float], **kwargs) -> bool:
         """Create a face profile for a user."""
         try:
             # Convert embedding to DynamoDB format
             embedding_decimal = [Decimal(str(x)) for x in embedding]
-            
+
             item = {
                 'PK': f'USER#{user_id}',
                 'SK': f'FACE#{image_id}',
@@ -128,15 +131,15 @@ class DynamoDBService:
                 'entity_type': 'FACE_PROFILE',
                 **kwargs
             }
-            
+
             self.table.put_item(Item=item)
-            print(f"[db] Created face profile: {image_id}")
+            logger.info("[db] Created face profile: %s", image_id)
             return True
-            
+
         except ClientError as e:
-            print(f"[db] Error creating face profile: {e}")
+            logger.error("[db] Error creating face profile: %s", e)
             return False
-    
+
     def get_user_face_profiles(self, user_id: str) -> List[Dict]:
         """Get all face profiles for a user."""
         try:
@@ -149,14 +152,14 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"[db] Error getting face profiles: {e}")
+            logger.error("[db] Error getting face profiles: %s", e)
             return []
-    
+
     # ==========================================
     # EVENT OPERATIONS
     # ==========================================
-    
-    def create_event(self, event_id: str, owner_id: str, name: str, 
+
+    def create_event(self, event_id: str, owner_id: str, name: str,
                      **kwargs) -> bool:
         """Create a new event."""
         try:
@@ -171,15 +174,15 @@ class DynamoDBService:
                 'entity_type': 'EVENT',
                 **kwargs
             }
-            
+
             self.table.put_item(Item=item)
-            print(f"[db] Created event: {event_id}")
+            logger.info("[db] Created event: %s", event_id)
             return True
-            
+
         except ClientError as e:
-            print(f"[db] Error creating event: {e}")
+            logger.error("[db] Error creating event: %s", e)
             return False
-    
+
     def get_event(self, event_id: str) -> Optional[Dict]:
         """Get event by ID."""
         try:
@@ -191,9 +194,9 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"[db] Error getting event: {e}")
+            logger.error("[db] Error getting event: %s", e)
             return None
-    
+
     def get_user_events(self, user_id: str) -> List[Dict]:
         """Get all events owned by a user."""
         try:
@@ -209,14 +212,14 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"[db] Error getting user events: {e}")
+            logger.error("[db] Error getting user events: %s", e)
             return []
-    
+
     # ==========================================
     # EVENT PARTICIPANT OPERATIONS
     # ==========================================
-    
-    def add_event_participant(self, event_id: str, user_id: str, 
+
+    def add_event_participant(self, event_id: str, user_id: str,
                               status: str = 'pending', **kwargs) -> bool:
         """Add a participant to an event."""
         try:
@@ -231,15 +234,15 @@ class DynamoDBService:
                 'entity_type': 'PARTICIPANT',
                 **kwargs
             }
-            
+
             self.table.put_item(Item=item)
-            print(f"[db] Added participant {user_id} to event {event_id}")
+            logger.info("[db] Added participant %s to event %s", user_id, event_id)
             return True
-            
+
         except ClientError as e:
-            print(f"[db] Error adding participant: {e}")
+            logger.error("[db] Error adding participant: %s", e)
             return False
-    
+
     def get_event_participants(self, event_id: str) -> List[Dict]:
         """Get all participants for an event."""
         try:
@@ -252,13 +255,13 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"[db] Error getting participants: {e}")
+            logger.error("[db] Error getting participants: %s", e)
             return []
-    
+
     # ==========================================
     # PHOTO OPERATIONS
     # ==========================================
-    
+
     def create_photo(self, photo_id: str, event_id: str, uploader_id: str,
                      s3_key: str, **kwargs) -> bool:
         """Create a photo record."""
@@ -276,15 +279,15 @@ class DynamoDBService:
                 'entity_type': 'PHOTO',
                 **kwargs
             }
-            
+
             self.table.put_item(Item=item)
-            print(f"[db] Created photo: {photo_id}")
+            logger.info("[db] Created photo: %s", photo_id)
             return True
-            
+
         except ClientError as e:
-            print(f"[db] Error creating photo: {e}")
+            logger.error("[db] Error creating photo: %s", e)
             return False
-    
+
     def get_event_photos(self, event_id: str) -> List[Dict]:
         """Get all photos for an event."""
         try:
@@ -297,13 +300,13 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"[db] Error getting photos: {e}")
+            logger.error("[db] Error getting photos: %s", e)
             return []
-    
+
     # ==========================================
     # FACE MATCH OPERATIONS
     # ==========================================
-    
+
     def create_face_match(self, match_id: str, photo_id: str, user_id: str,
                           confidence: float, **kwargs) -> bool:
         """Create a face match record."""
@@ -321,15 +324,15 @@ class DynamoDBService:
                 'entity_type': 'FACE_MATCH',
                 **kwargs
             }
-            
+
             self.table.put_item(Item=item)
-            print(f"[db] Created face match: {match_id}")
+            logger.info("[db] Created face match: %s", match_id)
             return True
-            
+
         except ClientError as e:
-            print(f"[db] Error creating face match: {e}")
+            logger.error("[db] Error creating face match: %s", e)
             return False
-    
+
     def get_photo_matches(self, photo_id: str) -> List[Dict]:
         """Get all face matches for a photo."""
         try:
@@ -342,9 +345,9 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"[db] Error getting photo matches: {e}")
+            logger.error("[db] Error getting photo matches: %s", e)
             return []
-    
+
     def get_user_photos(self, user_id: str) -> List[Dict]:
         """Get all photos where user appears (via face matches)."""
         try:
@@ -358,7 +361,7 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"[db] Error getting user photos: {e}")
+            logger.error("[db] Error getting user photos: %s", e)
             return []
 
 
@@ -402,7 +405,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error updating user: {e}")
+            logger.error("[db] Error updating user: %s", e)
             return False
 
     # ==========================================
@@ -417,7 +420,7 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"[db] Error getting face profile image: {e}")
+            logger.error("[db] Error getting face profile image: %s", e)
             return None
 
     def update_face_profile(self, user_id: str, image_id: str, **updates) -> bool:
@@ -432,7 +435,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error updating face profile: {e}")
+            logger.error("[db] Error updating face profile: %s", e)
             return False
 
     def delete_face_profile(self, user_id: str, image_id: str) -> bool:
@@ -443,7 +446,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error deleting face profile: {e}")
+            logger.error("[db] Error deleting face profile: %s", e)
             return False
 
     # ==========================================
@@ -462,7 +465,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error updating event: {e}")
+            logger.error("[db] Error updating event: %s", e)
             return False
 
     def delete_event(self, event_id: str) -> bool:
@@ -473,7 +476,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error deleting event: {e}")
+            logger.error("[db] Error deleting event: %s", e)
             return False
 
     def create_join_code_lookup(self, join_code: str, event_id: str) -> bool:
@@ -487,7 +490,7 @@ class DynamoDBService:
             })
             return True
         except ClientError as e:
-            print(f"[db] Error creating join code lookup: {e}")
+            logger.error("[db] Error creating join code lookup: %s", e)
             return False
 
     def delete_join_code_lookup(self, join_code: str) -> bool:
@@ -498,7 +501,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error deleting join code lookup: {e}")
+            logger.error("[db] Error deleting join code lookup: %s", e)
             return False
 
     def get_event_by_join_code(self, join_code: str) -> Optional[Dict]:
@@ -512,7 +515,7 @@ class DynamoDBService:
                 return None
             return self.get_event(item['event_id'])
         except ClientError as e:
-            print(f"[db] Error looking up join code: {e}")
+            logger.error("[db] Error looking up join code: %s", e)
             return None
 
     def get_events_user_joined(self, user_id: str) -> List[Dict]:
@@ -536,7 +539,7 @@ class DynamoDBService:
                     events.append(event)
             return events
         except ClientError as e:
-            print(f"[db] Error getting joined events: {e}")
+            logger.error("[db] Error getting joined events: %s", e)
             return []
 
     # ==========================================
@@ -551,7 +554,7 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"[db] Error getting participant: {e}")
+            logger.error("[db] Error getting participant: %s", e)
             return None
 
     def update_participant(self, event_id: str, user_id: str, **updates) -> bool:
@@ -566,7 +569,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error updating participant: {e}")
+            logger.error("[db] Error updating participant: %s", e)
             return False
 
     def update_participant_status(self, event_id: str, user_id: str, status: str) -> bool:
@@ -581,7 +584,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error updating participant status: {e}")
+            logger.error("[db] Error updating participant status: %s", e)
             return False
 
     def delete_participant(self, event_id: str, user_id: str) -> bool:
@@ -592,7 +595,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error deleting participant: {e}")
+            logger.error("[db] Error deleting participant: %s", e)
             return False
 
     # ==========================================
@@ -607,7 +610,7 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"[db] Error getting photo: {e}")
+            logger.error("[db] Error getting photo: %s", e)
             return None
 
     def update_photo(self, event_id: str, photo_id: str, **updates) -> bool:
@@ -622,7 +625,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error updating photo: {e}")
+            logger.error("[db] Error updating photo: %s", e)
             return False
 
     def delete_photo(self, event_id: str, photo_id: str) -> bool:
@@ -633,7 +636,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error deleting photo: {e}")
+            logger.error("[db] Error deleting photo: %s", e)
             return False
 
     # ==========================================
@@ -648,7 +651,7 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"[db] Error getting match: {e}")
+            logger.error("[db] Error getting match: %s", e)
             return None
 
     def update_match(self, photo_id: str, match_id: str, **updates) -> bool:
@@ -663,7 +666,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error updating match: {e}")
+            logger.error("[db] Error updating match: %s", e)
             return False
 
     def delete_match(self, photo_id: str, match_id: str) -> bool:
@@ -674,7 +677,7 @@ class DynamoDBService:
             )
             return True
         except ClientError as e:
-            print(f"[db] Error deleting match: {e}")
+            logger.error("[db] Error deleting match: %s", e)
             return False
 
     def get_user_photos_with_details(self, user_id: str) -> List[Dict]:
@@ -690,7 +693,7 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"[db] Error getting user photo matches: {e}")
+            logger.error("[db] Error getting user photo matches: %s", e)
             return []
 
     def get_photo_match_count(self, photo_id: str) -> int:
@@ -706,7 +709,7 @@ class DynamoDBService:
             )
             return response.get('Count', 0)
         except ClientError as e:
-            print(f"[db] Error counting photo matches: {e}")
+            logger.error("[db] Error counting photo matches: %s", e)
             return 0
 
 

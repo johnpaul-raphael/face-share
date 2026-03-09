@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from app.schemas.image import (
     PresignedUploadRequest, PresignedUploadResponse,
@@ -22,6 +23,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/presigned-upload", response_model=PresignedUploadResponse)
@@ -89,7 +91,7 @@ async def get_presigned_upload_url(
 @router.post("/presigned-download", response_model=PresignedDownloadResponse)
 async def get_presigned_download_url_endpoint(
     request: PresignedDownloadRequest,
-    current_user=Depends(get_current_user),
+    _current_user=Depends(get_current_user),
 ):
     download_url = generate_presigned_download_url(key=request.s3_key)
     if not download_url:
@@ -108,7 +110,6 @@ async def confirm_face_profile_upload(
     current_user=Depends(get_current_user),
 ):
     """Index the uploaded face image with Rekognition and save to DynamoDB."""
-    import traceback
 
     # -- Step 1: enforce image limit
     try:
@@ -117,27 +118,25 @@ async def confirm_face_profile_upload(
             raise HTTPException(status_code=400, detail="You can have at most 3 face profile images.")
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"[confirm-upload] [ERROR] DynamoDB get_user_face_profiles failed: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    except ClientError as e:
+        logger.error("[confirm-upload] DynamoDB get_user_face_profiles failed: %s", e)
+        raise HTTPException(status_code=500, detail="Database error")
 
     # -- Step 2: verify file in S3
-    print(f"[confirm-upload] Checking S3  bucket={settings.S3_BUCKET_NAME}  key={s3_key}")
+    logger.debug("[confirm-upload] Checking S3 bucket=%s key=%s", settings.S3_BUCKET_NAME, s3_key)
     try:
         exists = check_s3_object_exists(s3_key)
-    except Exception as e:
-        print(f"[confirm-upload] [ERROR] S3 check failed: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"S3 check error: {e}")
+    except ClientError as e:
+        logger.error("[confirm-upload] S3 check failed: %s", e)
+        raise HTTPException(status_code=500, detail="S3 check error")
 
     if not exists:
-        print(f"[confirm-upload] [ERROR] S3 object not found: {s3_key}")
+        logger.warning("[confirm-upload] S3 object not found: %s", s3_key)
         raise HTTPException(status_code=400, detail="Image upload to S3 did not complete. Please try again.")
-    print(f"[confirm-upload] [OK] S3 object found")
+    logger.debug("[confirm-upload] S3 object found")
 
     # -- Step 3: Rekognition index_faces
-    print(f"[confirm-upload] Calling Rekognition index_face...")
+    logger.debug("[confirm-upload] Calling Rekognition index_face...")
     try:
         result = rekognition_service.index_face(
             s3_bucket=settings.S3_BUCKET_NAME,
@@ -145,21 +144,20 @@ async def confirm_face_profile_upload(
             external_image_id=current_user.id,
         )
     except RuntimeError as e:
-        print(f"[confirm-upload] [ERROR] Rekognition RuntimeError: {e}")
+        logger.error("[confirm-upload] Rekognition RuntimeError: %s", e)
         if "invalid_image_format" in str(e):
             raise HTTPException(status_code=400, detail="Invalid image format. Please upload a JPEG or PNG file.")
-        raise HTTPException(status_code=502, detail=f"Face recognition service error: {e}")
+        raise HTTPException(status_code=502, detail="Face recognition service error")
     except Exception as e:
-        print(f"[confirm-upload] [ERROR] Unexpected Rekognition error: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Rekognition error: {e}")
+        logger.error("[confirm-upload] Unexpected Rekognition error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Rekognition error")
 
     if result is None:
         raise HTTPException(
             status_code=400,
             detail="No face detected. Please upload a clear, well-lit photo where your face is the main subject.",
         )
-    print(f"[confirm-upload] [OK] Face indexed: {result['face_id']} confidence={result['confidence']:.1f}%")
+    logger.info("[confirm-upload] Face indexed: %s confidence=%.1f%%", result['face_id'], result['confidence'])
 
     # -- Step 4: save to DynamoDB
     now = datetime.now(timezone.utc).isoformat()
@@ -175,13 +173,11 @@ async def confirm_face_profile_upload(
             created_at=now,
         )
     except Exception as e:
-        import traceback as tb
-        print(f"[confirm-upload] [ERROR] DynamoDB create_face_profile failed: {e}")
-        tb.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to save face profile: {e}")
+        logger.error("[confirm-upload] DynamoDB create_face_profile failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save face profile")
 
     url = generate_presigned_download_url(s3_key)
-    print(f"[confirm-upload] [OK] Done - face profile saved for user {current_user.id}")
+    logger.info("[confirm-upload] Done - face profile saved for user %s", current_user.id)
     return FaceProfileImageResponse(
         id=face_image_id,
         s3_key=s3_key,
@@ -259,7 +255,7 @@ async def process_event_photo(
         raise HTTPException(status_code=404, detail="Photo not found")
 
     s3_key = photo['s3_key']
-    print(f"[process-photo] Starting Rekognition search for photo {photo_id}")
+    logger.info("[process-photo] Starting Rekognition search for photo %s", photo_id)
 
     # Get all participant user IDs so we only create matches for event members
     participants_raw = dynamodb_service.get_event_participants(event_id)
@@ -273,7 +269,7 @@ async def process_event_photo(
             threshold=80.0,
         )
     except Exception as e:
-        print(f"[process-photo] [WARN] Rekognition search failed: {e} -- marking as processed with 0 matches")
+        logger.warning("[process-photo] Rekognition search failed: %s -- marking as processed with 0 matches", e)
         matches = []
 
     # Collect ALL matched user_ids from Rekognition (deduped by user_id, best similarity wins)
@@ -301,14 +297,14 @@ async def process_event_photo(
                 confidence=similarity,
                 created_at=now,
             )
-            print(f"[process-photo] [OK] Matched participant {user_id} (similarity={similarity:.1f}%)")
+            logger.info("[process-photo] Matched participant %s (similarity=%.1f%%)", user_id, similarity)
 
     unmatched_in_collection = [uid for uid in raw_matched_user_ids if uid not in participant_ids]
     if unmatched_in_collection:
-        print(f"[process-photo] Stored {len(unmatched_in_collection)} non-participant raw matches for future backfill")
+        logger.info("[process-photo] Stored %d non-participant raw matches for future backfill", len(unmatched_in_collection))
 
     if not matched_users:
-        print(f"[process-photo] No participant matches found -- photo goes to review")
+        logger.info("[process-photo] No participant matches found -- photo goes to review")
 
     # Mark photo as processed and persist raw matches for late-joiner support
     dynamodb_service.update_photo(
@@ -316,7 +312,10 @@ async def process_event_photo(
         is_processing=False,
         raw_matched_user_ids=raw_matched_user_ids,
     )
-    print(f"[process-photo] [OK] Done. matched_participants={len(matched_users)}, raw_matches={len(raw_matched_user_ids)}")
+    logger.info(
+        "[process-photo] Done. matched_participants=%d, raw_matches=%d",
+        len(matched_users), len(raw_matched_user_ids),
+    )
 
     return {"processed": True, "matches_found": len(matched_users)}
 
@@ -384,7 +383,7 @@ async def delete_event_photo(
     matches = dynamodb_service.get_photo_matches(photo_id)
     for match in matches:
         dynamodb_service.delete_match(photo_id, match['match_id'])
-    print(f"[delete-photo] Deleted {len(matches)} match records for photo {photo_id}")
+    logger.info("[delete-photo] Deleted %d match records for photo %s", len(matches), photo_id)
 
     # 2. Delete the photo record from DynamoDB
     dynamodb_service.delete_photo(event_id, photo_id)
@@ -394,4 +393,4 @@ async def delete_event_photo(
     if s3_key:
         delete_s3_object(s3_key)
 
-    print(f"[delete-photo] [OK] Photo {photo_id} fully deleted")
+    logger.info("[delete-photo] Photo %s fully deleted", photo_id)

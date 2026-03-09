@@ -22,7 +22,7 @@ export default function DashboardPage() {
       .then(setEvents)
       .catch(() => toast({ variant: 'destructive', title: 'Failed to load events' }))
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [toast]);
 
   return (
     <div className="space-y-6">

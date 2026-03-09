@@ -4,11 +4,14 @@ AWS Rekognition Service for FaceShare
 Handles face detection, indexing, and matching using AWS Rekognition.
 """
 
+import logging
 import boto3
 from botocore.exceptions import ClientError
 from typing import List, Dict, Optional
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class RekognitionService:
@@ -38,20 +41,20 @@ class RekognitionService:
         self.collection_id = collection_id or settings.REKOGNITION_COLLECTION_ID
         # Ensure the collection exists at startup
         self.create_collection()
-    
+
     def create_collection(self) -> bool:
         """Create a new face collection if it doesn't exist."""
         try:
             self.client.create_collection(CollectionId=self.collection_id)
-            print(f"[OK] Created collection: {self.collection_id}")
+            logger.info("Created collection: %s", self.collection_id)
             return True
         except ClientError as e:
-            if 'ResourceAlreadyExistsException' in str(e):
-                print(f"[INFO] Collection already exists: {self.collection_id}")
+            if e.response['Error']['Code'] == 'ResourceAlreadyExistsException':
+                logger.debug("Collection already exists: %s", self.collection_id)
                 return True
-            print(f"[ERROR] Error creating collection: {e}")
+            logger.error("Error creating collection: %s", e)
             return False
-    
+
     def _call_index_faces(self, image_param: dict, external_image_id: str) -> Optional[Dict]:
         """Call index_faces and parse the result."""
         response = self.client.index_faces(
@@ -64,12 +67,12 @@ class RekognitionService:
         )
         face_records = response.get('FaceRecords', [])
         unindexed = response.get('UnindexedFaces', [])
-        print(f"[rekognition] FaceRecords={len(face_records)} UnindexedFaces={len(unindexed)}")
+        logger.debug("FaceRecords=%d UnindexedFaces=%d", len(face_records), len(unindexed))
         for uf in unindexed:
-            print(f"  UnindexedFace reasons: {uf.get('Reasons', [])}")
+            logger.debug("UnindexedFace reasons: %s", uf.get('Reasons', []))
         if face_records:
             face = face_records[0]['Face']
-            print(f"[OK] Indexed face: {face['FaceId']} (confidence {face['Confidence']:.1f}%)")
+            logger.info("Indexed face: %s (confidence %.1f%%)", face['FaceId'], face['Confidence'])
             return {
                 'face_id': face['FaceId'],
                 'external_image_id': face['ExternalImageId'],
@@ -96,23 +99,21 @@ class RekognitionService:
         except ClientError as e:
             error_code = e.response['Error']['Code']
             error_msg = e.response['Error']['Message']
-            print(f"[ERROR] Rekognition error [{error_code}]: {error_msg}")
+            logger.error("Rekognition error [%s]: %s", error_code, error_msg)
             if error_code == 'InvalidImageFormatException':
-                raise RuntimeError(
-                    "invalid_image_format"
-                ) from e
+                raise RuntimeError("invalid_image_format") from e
             raise RuntimeError(f"Rekognition error: {error_code} - {error_msg}") from e
-    
+
     def search_faces_by_image(self, s3_bucket: str, s3_key: str,
                               threshold: float = 90.0) -> List[Dict]:
         """
         Search for matching faces in an image.
-        
+
         Args:
             s3_bucket: S3 bucket name
             s3_key: S3 object key (path to image)
             threshold: Minimum confidence score (0-100)
-        
+
         Returns:
             List of matching faces with confidence scores
         """
@@ -128,7 +129,7 @@ class RekognitionService:
                 FaceMatchThreshold=threshold,
                 MaxFaces=10
             )
-            
+
             matches = []
             for match in response.get('FaceMatches', []):
                 face = match['Face']
@@ -138,22 +139,22 @@ class RekognitionService:
                     'similarity': match['Similarity'],
                     'confidence': face['Confidence']
                 })
-            
-            print(f"[OK] Found {len(matches)} face matches")
+
+            logger.info("Found %d face matches", len(matches))
             return matches
-            
+
         except ClientError as e:
-            print(f"[ERROR] Error searching faces: {e}")
+            logger.error("Error searching faces: %s", e)
             return []
-    
+
     def detect_faces(self, s3_bucket: str, s3_key: str) -> List[Dict]:
         """
         Detect all faces in an image (without searching collection).
-        
+
         Args:
             s3_bucket: S3 bucket name
             s3_key: S3 object key
-        
+
         Returns:
             List of detected faces with bounding boxes
         """
@@ -167,7 +168,7 @@ class RekognitionService:
                 },
                 Attributes=['ALL']
             )
-            
+
             faces = []
             for face_detail in response.get('FaceDetails', []):
                 bbox = face_detail['BoundingBox']
@@ -183,21 +184,21 @@ class RekognitionService:
                     'gender': face_detail.get('Gender', {}),
                     'emotions': face_detail.get('Emotions', [])
                 })
-            
-            print(f"[OK] Detected {len(faces)} faces")
+
+            logger.info("Detected %d faces", len(faces))
             return faces
-            
+
         except ClientError as e:
-            print(f"[ERROR] Error detecting faces: {e}")
+            logger.error("Error detecting faces: %s", e)
             return []
-    
+
     def delete_face(self, face_id: str) -> bool:
         """
         Delete a face from the collection.
-        
+
         Args:
             face_id: Rekognition face ID
-        
+
         Returns:
             True if successful
         """
@@ -206,20 +207,20 @@ class RekognitionService:
                 CollectionId=self.collection_id,
                 FaceIds=[face_id]
             )
-            print(f"[OK] Deleted face: {face_id}")
+            logger.info("Deleted face: %s", face_id)
             return True
-            
+
         except ClientError as e:
-            print(f"[ERROR] Error deleting face: {e}")
+            logger.error("Error deleting face: %s", e)
             return False
-    
+
     def list_faces(self, max_results: int = 100) -> List[Dict]:
         """
         List all faces in the collection.
-        
+
         Args:
             max_results: Maximum number of faces to return
-        
+
         Returns:
             List of faces in the collection
         """
@@ -228,7 +229,7 @@ class RekognitionService:
                 CollectionId=self.collection_id,
                 MaxResults=max_results
             )
-            
+
             faces = []
             for face in response.get('Faces', []):
                 faces.append({
@@ -236,12 +237,12 @@ class RekognitionService:
                     'external_image_id': face['ExternalImageId'],
                     'confidence': face['Confidence']
                 })
-            
-            print(f"[OK] Listed {len(faces)} faces")
+
+            logger.info("Listed %d faces", len(faces))
             return faces
-            
+
         except ClientError as e:
-            print(f"[ERROR] Error listing faces: {e}")
+            logger.error("Error listing faces: %s", e)
             return []
 
 
