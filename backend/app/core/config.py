@@ -141,9 +141,9 @@ class Settings(BaseSettings):
     # ==========================================
     model_config = SettingsConfigDict(
         env_file=".env",  # Default env file to load
-        env_file_encoding='utf-8', # File encoding
-        case_sensitive=True,       # Variable names are case-sensitive
-        extra='ignore'             # Ignore extra variables in .env
+        env_file_encoding='utf-8',  # File encoding
+        case_sensitive=True,  # Variable names are case-sensitive
+        extra='ignore'  # Ignore extra variables in .env
     )
 
     # ==========================================
