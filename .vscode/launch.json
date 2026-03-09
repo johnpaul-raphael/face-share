@@ -1,0 +1,43 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "FastAPI: Debug Backend",
+        "type": "python",
+        "request": "launch",
+        "module": "uvicorn",
+        "cwd": "${workspaceFolder}/backend",
+        "args": [
+          "app.main:app",
+          "--host",
+          "127.0.0.1",
+             "--port",
+          "8000"
+        ],
+        "envFile": "${workspaceFolder}/backend/.env",
+        "console": "integratedTerminal"
+      },
+      {
+        "name": "Next.js: Debug Server",
+        "type": "node",
+        "request": "launch",
+        "cwd": "${workspaceFolder}",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": ["run", "dev"],
+        "env": {
+          "NODE_OPTIONS": "--inspect"
+        },
+        "console": "integratedTerminal",
+        "skipFiles": ["<node_internals>/**"]
+      }
+    ],
+    "compounds": [
+      {
+        "name": "Full Stack Debug (FastAPI + Next.js)",
+        "configurations": [
+          "FastAPI: Debug Backend",
+          "Next.js: Debug Server"
+        ]
+      }
+    ]
+  }  

@@ -1,0 +1,233 @@
+# ==========================================
+# FaceShare Backend - Git Ignore
+# ==========================================
+# This file specifies files Git should ignore
+# NEVER commit sensitive credentials or local data!
+# ==========================================
+
+# ------------------------------------------
+# ENVIRONMENT FILES (NEVER COMMIT!)
+# ------------------------------------------
+# These contain secrets and credentials
+.env
+.env.dev
+.env.qa
+.env.prod
+.env.local
+!.env.example          # Template is safe to commit
+
+# ------------------------------------------
+# PYTHON
+# ------------------------------------------
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django / Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+
+# SageMath
+*.sage.py
+
+# Environments (already covered above)
+# .env
+# .venv
+
+# Spyder project settings
+.spyderproject
+.spyderworkspace
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ------------------------------------------
+# LOCAL DATABASE FILES
+# ------------------------------------------
+# SQLite databases (local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Local data directories
+dataset/
+event_uploads/
+data/
+uploads/
+
+# ------------------------------------------
+# IDE / EDITORS
+# ------------------------------------------
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Vim
+*.swp
+*.swo
+*.swn
+
+# ------------------------------------------
+# OPERATING SYSTEM
+# ------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ------------------------------------------
+# LOGS AND TEMP FILES
+# ------------------------------------------
+*.log
+logs/
+log/
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# ------------------------------------------
+# TEST FILES
+# ------------------------------------------
+test-image.*
+test-upload.*
+downloaded.*
+*.test.jpg
+*.test.png
+
+# ==========================================
