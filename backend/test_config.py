@@ -21,7 +21,6 @@ What This Tests:
     ✅ Environment file loading
     ✅ AWS credentials configuration
     ✅ S3 bucket settings
-    ✅ Database URL
     ✅ Security settings
     ✅ CORS origins
 """
@@ -52,9 +51,6 @@ def test_configuration():
     print("\n📍 ENVIRONMENT")
     print("-" * 40)
     print(f"Current Environment:  {settings.ENVIRONMENT}")
-    print(f"Is Development:       {settings.is_development}")
-    print(f"Is QA:                {settings.is_qa}")
-    print(f"Is Production:        {settings.is_production}")
     
     # Application Settings
     print("\n📱 APPLICATION")
@@ -83,12 +79,6 @@ def test_configuration():
         print(f"AWS Secret Key:       ✅ SET (hidden for security)")
     else:
         print(f"AWS Secret Key:       ❌ NOT SET")
-    
-    # Database Settings
-    print("\n🗄️  DATABASE")
-    print("-" * 40)
-    print(f"Database URL:         {settings.DATABASE_URL}")
-    print(f"Is Local Database:    {settings.is_local_database}")
     
     # Security Settings
     print("\n🔒 SECURITY")
@@ -138,7 +128,7 @@ def test_configuration():
         warnings.append("⚠️  SECRET_KEY should be at least 32 characters for security")
     
     # Check S3 bucket
-    if "yourname" in settings.S3_BUCKET_NAME or "example" in settings.S3_BUCKET_NAME:
+    if settings.S3_BUCKET_NAME and ("yourname" in settings.S3_BUCKET_NAME or "example" in settings.S3_BUCKET_NAME):
         warnings.append("⚠️  S3_BUCKET_NAME contains placeholder text")
     
     # Print results
