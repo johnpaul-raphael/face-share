@@ -1,14 +1,47 @@
 name: CI/CD Pipeline
 
 on:
+  # Auto-deploy on merge to develop (always dev stage)
   push:
     branches: [develop]
+
+  # Manual deploy with environment choice
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deploy target"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+      deploy_backend:
+        description: "Deploy backend?"
+        required: true
+        default: true
+        type: boolean
+      deploy_frontend:
+        description: "Deploy frontend?"
+        required: true
+        default: true
+        type: boolean
+
+# Least-privilege: restrict default token to read-only
+permissions:
+  contents: read
+
+# Resolve the stage: manual runs use the input, auto runs always use 'dev'
+env:
+  STAGE: ${{ github.event.inputs.environment || 'dev' }}
 
 jobs:
   # ─── Job 1: Backend lint + tests ────────────────────────────────────────────
   backend-ci:
     name: Backend CI
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +67,8 @@ jobs:
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -51,11 +86,16 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-  # ─── Job 3: Deploy backend to AWS Lambda (dev stage) ────────────────────────
+  # ─── Job 3: Deploy backend ────────────────────────────────────────────────────
   deploy-backend:
-    name: Deploy Backend (Lambda dev)
+    name: Deploy Backend (Lambda)
     runs-on: ubuntu-latest
     needs: [backend-ci]
+    # Use 'false' string comparison — workflow_dispatch booleans arrive as strings
+    if: github.event.inputs.deploy_backend != 'false'
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -68,13 +108,15 @@ jobs:
           python-version: "3.12"
 
       - name: Install Serverless dependencies
-        run: npm install
+        run: npm ci
         working-directory: infrastructure
 
       - name: Deploy
-        run: npx serverless deploy --stage dev
+        # Reference $SERVERLESS_STAGE as a shell variable (not ${{ }}) to prevent script injection
+        run: npx serverless deploy --stage "$SERVERLESS_STAGE"
         working-directory: infrastructure
         env:
+          SERVERLESS_STAGE: ${{ env.STAGE }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
@@ -87,6 +129,9 @@ jobs:
     name: Deploy Frontend (Vercel)
     runs-on: ubuntu-latest
     needs: [frontend-ci]
+    if: github.event.inputs.deploy_frontend != 'false'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 

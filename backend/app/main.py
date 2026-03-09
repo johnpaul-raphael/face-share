@@ -4,7 +4,6 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.api import auth, users, events, participants, images
 import logging
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +27,7 @@ def _cors_headers_for_request(request: Request) -> dict:
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Ensure 500 responses include CORS headers so the frontend sees the real error."""
-    print(f"\n{'='*60}")
-    print(f"500 ERROR  {request.method} {request.url}")
-    print(f"{'='*60}")
-    traceback.print_exc()
-    print(f"{'='*60}\n")
+    logger.error("500 ERROR  %s %s", request.method, request.url, exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc) or "Internal server error"},
@@ -48,8 +43,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
 )
 
 # Include routers

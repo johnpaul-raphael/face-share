@@ -6,14 +6,14 @@ Supports multiple environments: development, qa, production
 
 Usage:
     from app.core.config import settings
-    
+
     # Access configuration
     db_url = settings.DATABASE_URL
-    
+
     # Check environment
     if settings.is_development:
-        print("Running in development mode")
-    
+        logger.debug("Running in development mode")
+
 Environment Files:
     - .env          : Local development (default)
     - .env.dev      : Shared development
@@ -25,49 +25,52 @@ Switching Environments:
     1. Set ENVIRONMENT variable:
        $env:ENVIRONMENT="qa"  # PowerShell
        export ENVIRONMENT=qa   # Linux/Mac
-    
+
     2. Or specify file directly:
        $env:ENV_FILE=".env.qa"
-    
+
 Security:
     - NEVER commit .env files with real credentials
     - .env files are listed in .gitignore
     - Use .env.example as a template
 """
 
+import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List, Any
 from pydantic import model_validator
 import json
 import os
 
+logger = logging.getLogger(__name__)
+
 
 class Settings(BaseSettings):
     """
     Application settings loaded from environment files.
-    
+
     Attributes are loaded from .env file (or specified env file).
     Type hints ensure proper validation.
     """
-    
+
     # ==========================================
     # ENVIRONMENT SETTINGS
     # ==========================================
     ENVIRONMENT: str = "development"
     """Current environment: development, qa, or production"""
-    
+
     # ==========================================
     # APPLICATION SETTINGS
     # ==========================================
     PROJECT_NAME: str = "FaceShare API"
     """API project name used in documentation"""
-    
+
     VERSION: str = "1.0.0"
     """API version number"""
-    
+
     API_V1_STR: str = "/api/v1"
     """Base path for API routes"""
-    
+
     # ==========================================
     # SECURITY SETTINGS
     # ==========================================
@@ -76,16 +79,16 @@ class Settings(BaseSettings):
     JWT signing secret.
     Generate with: openssl rand -hex 32
     """
-    
+
     ALGORITHM: str = "HS256"
     """JWT encryption algorithm"""
-    
+
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     """How long access tokens are valid (minutes)"""
-    
+
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     """How long refresh tokens are valid (days)"""
-    
+
     # ==========================================
     # AWS SETTINGS
     # ==========================================
@@ -93,19 +96,19 @@ class Settings(BaseSettings):
     """DynamoDB table name for storing all application data"""
     AWS_ACCESS_KEY_ID: Optional[str] = None
     """AWS IAM access key (from AWS Console)"""
-    
+
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     """AWS IAM secret key (keep secure!)"""
-    
+
     AWS_REGION: str = None
     """AWS region for all services (S3, Rekognition, etc.)"""
-    
+
     S3_BUCKET_NAME: str = None
     """
     S3 bucket name for storing images.
     Must be globally unique across all AWS accounts.
     """
-    
+
     S3_PRESIGNED_URL_EXPIRATION: int = 3600  # 1 hour
     """How long presigned URLs are valid (seconds)"""
 
@@ -114,7 +117,7 @@ class Settings(BaseSettings):
     # ==========================================
     REKOGNITION_COLLECTION_ID: str = "faceshare-collection"
     """AWS Rekognition face collection ID"""
-    
+
     # ==========================================
     # GOOGLE SSO
     # ==========================================
@@ -132,7 +135,7 @@ class Settings(BaseSettings):
         - Comma-separated: "http://localhost:3000,https://app.com"
         - JSON array: '["http://localhost:3000", "https://app.com"]'
     """
-    
+
     # ==========================================
     # PYDANTIC CONFIGURATION
     # ==========================================
@@ -142,7 +145,7 @@ class Settings(BaseSettings):
         case_sensitive=True,       # Variable names are case-sensitive
         extra='ignore'             # Ignore extra variables in .env
     )
-    
+
     # ==========================================
     # VALIDATORS
     # ==========================================
@@ -171,7 +174,7 @@ class Settings(BaseSettings):
             # Already a list, ensure all items are strings and stripped
             self.CORS_ORIGINS = [str(origin).strip() for origin in self.CORS_ORIGINS if origin]
         return self
-    
+
     # ==========================================
     # HELPER PROPERTIES
     # ==========================================
@@ -179,12 +182,12 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         """Check if running in development environment"""
         return self.ENVIRONMENT.lower() == "development"
-    
+
     @property
     def is_qa(self) -> bool:
         """Check if running in QA/staging environment"""
         return self.ENVIRONMENT.lower() == "qa"
-    
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment"""
@@ -194,35 +197,35 @@ class Settings(BaseSettings):
 def get_environment_file() -> str:
     """
     Determine which .env file to load based on environment.
-    
+
     Priority:
         1. ENV_FILE environment variable (explicit file path)
         2. ENVIRONMENT variable (maps to .env.{environment})
         3. Default to .env (local development)
-    
+
     Returns:
         str: Path to the environment file to load
     """
     # Check if explicit file specified
     if os.getenv("ENV_FILE"):
         env_file = os.getenv("ENV_FILE")
-        print(f"[config] Using explicit env file: {env_file}")
+        logger.debug("[config] Using explicit env file: %s", env_file)
         return env_file
 
     # Check environment name
     env = os.getenv("ENVIRONMENT", "development").lower()
 
     if env == "qa":
-        print("[config] Loading QA environment from .env.qa")
+        logger.debug("[config] Loading QA environment from .env.qa")
         return ".env.qa"
-    elif env == "production" or env == "prod":
-        print("[config] Loading Production environment from .env.prod")
+    elif env in ("production", "prod"):
+        logger.debug("[config] Loading Production environment from .env.prod")
         return ".env.prod"
-    elif env == "development" or env == "dev":
-        print("[config] Loading Development environment from .env")
+    elif env in ("development", "dev"):
+        logger.debug("[config] Loading Development environment from .env")
         return ".env"
     else:
-        print(f"[config] Unknown environment '{env}', using default .env")
+        logger.warning("[config] Unknown environment '%s', using default .env", env)
         return ".env"
 
 
@@ -236,13 +239,11 @@ _env_file = get_environment_file()
 # Create settings instance with selected environment
 settings = Settings(_env_file=_env_file)
 
-# Print configuration summary (remove in production if desired)
-print(f"\n{'='*50}")
-print(f"[CONFIG] FaceShare API Configuration")
-print(f"{'='*50}")
-print(f"Environment:    {settings.ENVIRONMENT}")
-print(f"S3 Bucket:      {settings.S3_BUCKET_NAME}")
-print(f"AWS Region:     {settings.AWS_REGION}")
-print(f"DynamoDB Table: {settings.AWS_DYNAMODB_TABLE_NAME}")
-print(f"API Base Path:  {settings.API_V1_STR}")
-print(f"{'='*50}\n")
+# Log configuration summary at DEBUG level (not visible in production by default)
+logger.debug(
+    "[CONFIG] FaceShare API | env=%s | bucket=%s | region=%s | table=%s",
+    settings.ENVIRONMENT,
+    settings.S3_BUCKET_NAME,
+    settings.AWS_REGION,
+    settings.AWS_DYNAMODB_TABLE_NAME,
+)
