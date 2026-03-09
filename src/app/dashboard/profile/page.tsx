@@ -73,7 +73,7 @@ export default function ProfilePage() {
     };
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [toast]);
 
   // ─── Profile info ───────────────────────────────────────────────────────────
 
@@ -243,6 +243,7 @@ export default function ProfilePage() {
           >
             <X className="h-5 w-5" />
           </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
             alt="Preview"
@@ -355,6 +356,7 @@ export default function ProfilePage() {
                       {displayUrl ? (
                         <>
                           {/* Image — click to preview full-size */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={displayUrl}
                             alt={`Face photo ${slot.index + 1}`}

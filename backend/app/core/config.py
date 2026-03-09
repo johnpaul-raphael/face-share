@@ -37,7 +37,7 @@ Security:
 
 import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional, List, Any
+from typing import Optional, Any
 from pydantic import model_validator
 import json
 import os
@@ -140,7 +140,7 @@ class Settings(BaseSettings):
     # PYDANTIC CONFIGURATION
     # ==========================================
     model_config = SettingsConfigDict(
-        env_file=".env",           # Default env file to load
+        env_file=".env",  # Default env file to load
         env_file_encoding='utf-8', # File encoding
         case_sensitive=True,       # Variable names are case-sensitive
         extra='ignore'             # Ignore extra variables in .env

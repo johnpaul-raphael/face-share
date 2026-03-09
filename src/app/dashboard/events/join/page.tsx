@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,16 +24,7 @@ function JoinEventPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
-  useEffect(() => {
-    const codeFromParams = searchParams.get('code');
-    if (codeFromParams) {
-      const upperCode = codeFromParams.toUpperCase();
-      setJoinCode(upperCode);
-      previewEvent(upperCode);
-    }
-  }, [searchParams]);
-
-  const previewEvent = async (code: string) => {
+  const previewEvent = useCallback(async (code: string) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -61,7 +52,16 @@ function JoinEventPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, toast]);
+
+  useEffect(() => {
+    const codeFromParams = searchParams.get('code');
+    if (codeFromParams) {
+      const upperCode = codeFromParams.toUpperCase();
+      setJoinCode(upperCode);
+      previewEvent(upperCode);
+    }
+  }, [searchParams, previewEvent]);
 
   const handleCodeSubmit = () => {
     if (joinCode.length === 6) {
@@ -102,6 +102,7 @@ function JoinEventPage() {
           <Card className="overflow-hidden">
             <div className="relative h-48 w-full bg-muted flex items-center justify-center">
               {event.cover_image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={event.cover_image_url} alt={event.name} className="h-full w-full object-cover" />
               ) : (
                 <span className="text-muted-foreground text-sm">No cover image</span>

@@ -55,4 +55,3 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     if payload and payload.get("type") == "access":
         return payload.get("sub")
     return None
-

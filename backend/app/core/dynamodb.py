@@ -7,10 +7,9 @@ Handles all DynamoDB operations with proper error handling and logging.
 import logging
 import boto3
 from botocore.exceptions import ClientError
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from decimal import Decimal
 from datetime import datetime, timezone
-import json
 
 from app.core.config import settings
 
@@ -115,7 +114,7 @@ class DynamoDBService:
     # ==========================================
 
     def create_face_profile(self, user_id: str, image_id: str,
-                           s3_key: str, embedding: List[float], **kwargs) -> bool:
+                            s3_key: str, embedding: List[float], **kwargs) -> bool:
         """Create a face profile for a user."""
         try:
             # Convert embedding to DynamoDB format
@@ -363,7 +362,6 @@ class DynamoDBService:
         except ClientError as e:
             logger.error("[db] Error getting user photos: %s", e)
             return []
-
 
     # ==========================================
     # INTERNAL HELPERS
