@@ -100,10 +100,10 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     """AWS IAM secret key (keep secure!)"""
 
-    AWS_REGION: str = None
+    AWS_REGION: Optional[str] = None
     """AWS region for all services (S3, Rekognition, etc.)"""
 
-    S3_BUCKET_NAME: str = None
+    S3_BUCKET_NAME: Optional[str] = None
     """
     S3 bucket name for storing images.
     Must be globally unique across all AWS accounts.
