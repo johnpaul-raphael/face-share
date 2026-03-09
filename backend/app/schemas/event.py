@@ -2,7 +2,12 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
-from app.database.models import ParticipationStatus
+from enum import Enum
+
+
+class ParticipationStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
 
 
 class EventBase(BaseModel):
@@ -21,32 +26,25 @@ class EventUpdate(BaseModel):
 
 
 class EventParticipantResponse(BaseModel):
-    id: UUID
-    user_id: UUID
+    user_id: str
     user_name: str
     user_email: str
-    user_avatar_url: Optional[str]
+    user_avatar_url: Optional[str] = None
     status: ParticipationStatus
-    joined_at: datetime
-
-    class Config:
-        from_attributes = True
+    joined_at: Optional[datetime] = None
+    can_upload: bool = False
 
 
 class EventResponse(EventBase):
-    id: UUID
-    owner_id: UUID
+    id: str
+    owner_id: str
     owner_name: str
     cover_image_url: Optional[str] = None
+    cover_photo_s3_key: Optional[str] = None
     join_code: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    created_at: str
+    updated_at: Optional[str] = None
     participant_count: int = 0
-    confirmed_participant_count: int = 0
-    pending_participant_count: int = 0
-
-    class Config:
-        from_attributes = True
 
 
 class EventDetailResponse(EventResponse):

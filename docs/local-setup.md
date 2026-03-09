@@ -68,6 +68,33 @@ Edit `backend/.env`:
 | `AWS_SECRET_ACCESS_KEY` | ⚠️ For S3 | Leave blank to disable S3 |
 | `S3_BUCKET_NAME` | ⚠️ For S3 | e.g. `faceshare-uploads` |
 | `CORS_ORIGINS` | ✅ | `["http://localhost:3000","http://localhost:9002"]` |
+| `KIMI_API_KEY` | ⚠️ For Kimi Code/CLI | used by local tooling and VS Code extension |
+| `KIMI_MODEL` | ⚠️ | default model (`k2`)
+
+> The `KIMI_*` variables are optional; set them if you're using the Kimi Code extension or CLI. They can live in the project root `.env` or in your shell environment.
+>
+> ## Configuring the Kimi Code extension in VS Code
+>
+> If you install the **Kimi Code** extension, it will automatically look for `KIMI_API_KEY` in your environment. You can also enter the key directly in VS Code settings:
+>
+> 1. Open **Settings** (`Ctrl+,`) and search for "kimi".
+> 2. Paste the API key into **Kimi: Api Key** (or similar setting).
+> 3. Set **Kimi: Default Model** to `k2` if available.
+>
+> Alternatively, add these lines to your user `settings.json`:
+> ```json
+> {
+>   "kimi.apiKey": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+>   "kimi.defaultModel": "k2",
+>   "kimi.baseUrl": "https://api.kimi.ai"
+> }
+> ```
+> 
+> Restart VS Code after setting environment variables with `setx`.
+
+
+
+### 1.4 Database
 
 ### 1.4 Database
 

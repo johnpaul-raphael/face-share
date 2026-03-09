@@ -1,7 +1,5 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime
-from uuid import UUID
 
 
 class UserBase(BaseModel):
@@ -20,12 +18,10 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
-    id: UUID
+    id: str
     avatar_url: Optional[str] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class FaceProfileImageBase(BaseModel):
@@ -37,17 +33,14 @@ class FaceProfileImageCreate(FaceProfileImageBase):
 
 
 class FaceProfileImageResponse(FaceProfileImageBase):
-    id: UUID
+    id: str
     s3_key: str
     url: Optional[str] = None  # Presigned URL
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+    created_at: Optional[str] = None
 
 
 class FaceProfileResponse(BaseModel):
-    user_id: UUID
+    user_id: str
     images: list[FaceProfileImageResponse]
     image_count: int
     is_complete: bool  # True if 3-5 images

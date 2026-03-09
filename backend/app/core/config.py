@@ -87,20 +87,10 @@ class Settings(BaseSettings):
     """How long refresh tokens are valid (days)"""
     
     # ==========================================
-    # DATABASE SETTINGS
-    # ==========================================
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/faceshare"
-    """
-    Database connection string.
-    Examples:
-        SQLite:     sqlite:///./app.db
-        PostgreSQL: postgresql://user:pass@localhost/dbname
-        AWS RDS:    postgresql://user:pass@host.region.rds.amazonaws.com:5432/db
-    """
-    
-    # ==========================================
     # AWS SETTINGS
     # ==========================================
+    AWS_DYNAMODB_TABLE_NAME: Optional[str] = None
+    """DynamoDB table name for storing all application data"""
     AWS_ACCESS_KEY_ID: Optional[str] = None
     """AWS IAM access key (from AWS Console)"""
     
@@ -118,7 +108,19 @@ class Settings(BaseSettings):
     
     S3_PRESIGNED_URL_EXPIRATION: int = 3600  # 1 hour
     """How long presigned URLs are valid (seconds)"""
+
+    # ==========================================
+    # REKOGNITION SETTINGS
+    # ==========================================
+    REKOGNITION_COLLECTION_ID: str = "faceshare-collection"
+    """AWS Rekognition face collection ID"""
     
+    # ==========================================
+    # GOOGLE SSO
+    # ==========================================
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    """Google OAuth 2.0 Client ID for verifying Google ID tokens"""
+
     # ==========================================
     # CORS SETTINGS
     # ==========================================
@@ -161,10 +163,13 @@ class Settings(BaseSettings):
                     pass
             # Fall back to comma-separated: url1,url2
             self.CORS_ORIGINS = [
-                origin.strip() 
-                for origin in v.split(',') 
+                origin.strip()
+                for origin in v.split(',')
                 if origin.strip()
             ]
+        elif isinstance(self.CORS_ORIGINS, list):
+            # Already a list, ensure all items are strings and stripped
+            self.CORS_ORIGINS = [str(origin).strip() for origin in self.CORS_ORIGINS if origin]
         return self
     
     # ==========================================
@@ -184,11 +189,6 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Check if running in production environment"""
         return self.ENVIRONMENT.lower() == "production"
-    
-    @property
-    def is_local_database(self) -> bool:
-        """Check if using local database (SQLite or local PostgreSQL)"""
-        return "localhost" in self.DATABASE_URL or "sqlite" in self.DATABASE_URL
 
 
 def get_environment_file() -> str:
@@ -206,23 +206,23 @@ def get_environment_file() -> str:
     # Check if explicit file specified
     if os.getenv("ENV_FILE"):
         env_file = os.getenv("ENV_FILE")
-        print(f"📄 Using explicit env file: {env_file}")
+        print(f"[config] Using explicit env file: {env_file}")
         return env_file
-    
+
     # Check environment name
     env = os.getenv("ENVIRONMENT", "development").lower()
-    
+
     if env == "qa":
-        print(f"🧪 Loading QA environment from .env.qa")
+        print("[config] Loading QA environment from .env.qa")
         return ".env.qa"
     elif env == "production" or env == "prod":
-        print(f"🚀 Loading Production environment from .env.prod")
+        print("[config] Loading Production environment from .env.prod")
         return ".env.prod"
     elif env == "development" or env == "dev":
-        print(f"🛠️  Loading Development environment from .env")
+        print("[config] Loading Development environment from .env")
         return ".env"
     else:
-        print(f"⚠️  Unknown environment '{env}', using default .env")
+        print(f"[config] Unknown environment '{env}', using default .env")
         return ".env"
 
 
@@ -238,11 +238,11 @@ settings = Settings(_env_file=_env_file)
 
 # Print configuration summary (remove in production if desired)
 print(f"\n{'='*50}")
-print(f"🔧 FaceShare API Configuration")
+print(f"[CONFIG] FaceShare API Configuration")
 print(f"{'='*50}")
 print(f"Environment:    {settings.ENVIRONMENT}")
 print(f"S3 Bucket:      {settings.S3_BUCKET_NAME}")
 print(f"AWS Region:     {settings.AWS_REGION}")
-print(f"Database:       {'Local' if settings.is_local_database else 'Remote'}")
+print(f"DynamoDB Table: {settings.AWS_DYNAMODB_TABLE_NAME}")
 print(f"API Base Path:  {settings.API_V1_STR}")
 print(f"{'='*50}\n")

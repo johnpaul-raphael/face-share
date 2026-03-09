@@ -1,141 +1,105 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from uuid import UUID
-from app.database.session import get_db
-from app.database.models import User, Event, EventParticipant, ParticipationStatus
-from app.schemas.event import EventParticipantResponse
+from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
+from app.core.dynamodb import dynamodb_service
+from app.schemas.event import EventParticipantResponse, ParticipationStatus
 
 router = APIRouter()
 
 
 @router.get("/events/{event_id}/participants", response_model=list[EventParticipantResponse])
-async def list_participants(
-    event_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """List all participants of an event."""
-    # Check if user is a participant
-    participation = db.query(EventParticipant).filter(
-        EventParticipant.event_id == event_id,
-        EventParticipant.user_id == current_user.id
-    ).first()
-    
-    if not participation:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a participant of this event"
-        )
-    
-    participants = db.query(EventParticipant).filter(
-        EventParticipant.event_id == event_id
-    ).all()
-    
+async def list_participants(event_id: str, current_user=Depends(get_current_user)):
+    event = dynamodb_service.get_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    participant = dynamodb_service.get_participant(event_id, current_user.id)
+    if not participant and event.get('owner_id') != current_user.id:
+        raise HTTPException(status_code=403, detail="Not a participant of this event")
+
+    participants_raw = dynamodb_service.get_event_participants(event_id)
     return [
         EventParticipantResponse(
-            id=p.id,
-            user_id=p.user_id,
-            user_name=p.user.name,
-            user_email=p.user.email,
-            user_avatar_url=p.user.avatar_url,
-            status=p.status,
-            joined_at=p.joined_at
+            user_id=p['user_id'],
+            user_name=p.get('user_name', ''),
+            user_email=p.get('user_email', ''),
+            user_avatar_url=p.get('user_avatar_url'),
+            status=ParticipationStatus(p.get('status', 'approved')),
+            joined_at=p.get('joined_at'),
+            can_upload=p.get('can_upload', False),
         )
-        for p in participants
+        for p in participants_raw
     ]
 
 
 @router.patch("/events/{event_id}/participants/{user_id}/approve", response_model=EventParticipantResponse)
-async def approve_participant(
-    event_id: UUID,
-    user_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Approve a pending participant (owner only)."""
-    event = db.query(Event).filter(Event.id == event_id).first()
-    
+async def approve_participant(event_id: str, user_id: str, current_user=Depends(get_current_user)):
+    event = dynamodb_service.get_event(event_id)
     if not event:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Event not found"
-        )
-    
-    if event.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the event owner can approve participants"
-        )
-    
-    participation = db.query(EventParticipant).filter(
-        EventParticipant.event_id == event_id,
-        EventParticipant.user_id == user_id
-    ).first()
-    
-    if not participation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Participation not found"
-        )
-    
-    participation.status = ParticipationStatus.CONFIRMED
-    db.commit()
-    db.refresh(participation)
-    
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event['owner_id'] != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the event owner can approve participants")
+
+    participant = dynamodb_service.get_participant(event_id, user_id)
+    if not participant:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    dynamodb_service.update_participant_status(event_id, user_id, 'approved')
+    updated = dynamodb_service.get_participant(event_id, user_id)
     return EventParticipantResponse(
-        id=participation.id,
-        user_id=participation.user_id,
-        user_name=participation.user.name,
-        user_email=participation.user.email,
-        user_avatar_url=participation.user.avatar_url,
-        status=participation.status,
-        joined_at=participation.joined_at
+        user_id=updated['user_id'],
+        user_name=updated.get('user_name', ''),
+        user_email=updated.get('user_email', ''),
+        user_avatar_url=updated.get('user_avatar_url'),
+        status=ParticipationStatus(updated.get('status', 'approved')),
+        joined_at=updated.get('joined_at'),
+        can_upload=updated.get('can_upload', False),
     )
 
 
-@router.delete("/events/{event_id}/participants/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_participant(
-    event_id: UUID,
-    user_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+@router.patch("/events/{event_id}/participants/{user_id}/upload-permission", response_model=EventParticipantResponse)
+async def set_upload_permission(
+    event_id: str,
+    user_id: str,
+    grant: bool,
+    current_user=Depends(get_current_user),
 ):
-    """Remove a participant (owner only, or self-removal)."""
-    event = db.query(Event).filter(Event.id == event_id).first()
-    
+    """Grant or revoke upload permission for a participant (owner only)."""
+    event = dynamodb_service.get_event(event_id)
     if not event:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Event not found"
-        )
-    
-    participation = db.query(EventParticipant).filter(
-        EventParticipant.event_id == event_id,
-        EventParticipant.user_id == user_id
-    ).first()
-    
-    if not participation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Participation not found"
-        )
-    
-    # Allow removal if owner or self
-    if event.owner_id != current_user.id and user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only remove yourself or be removed by the event owner"
-        )
-    
-    # Don't allow owner to remove themselves
-    if event.owner_id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Event owner cannot be removed"
-        )
-    
-    db.delete(participation)
-    db.commit()
-    
-    return None
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event['owner_id'] != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the event owner can manage upload permissions")
+
+    participant = dynamodb_service.get_participant(event_id, user_id)
+    if not participant:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    dynamodb_service.update_participant(event_id, user_id, can_upload=grant)
+    updated = dynamodb_service.get_participant(event_id, user_id)
+    return EventParticipantResponse(
+        user_id=updated['user_id'],
+        user_name=updated.get('user_name', ''),
+        user_email=updated.get('user_email', ''),
+        user_avatar_url=updated.get('user_avatar_url'),
+        status=ParticipationStatus(updated.get('status', 'approved')),
+        joined_at=updated.get('joined_at'),
+        can_upload=updated.get('can_upload', False),
+    )
+
+
+@router.delete("/events/{event_id}/participants/{user_id}", status_code=204)
+async def remove_participant(event_id: str, user_id: str, current_user=Depends(get_current_user)):
+    event = dynamodb_service.get_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    is_owner = event['owner_id'] == current_user.id
+    is_self = current_user.id == user_id
+    if not is_owner and not is_self:
+        raise HTTPException(status_code=403, detail="You do not have permission to remove this participant")
+
+    participant = dynamodb_service.get_participant(event_id, user_id)
+    if not participant:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    dynamodb_service.delete_participant(event_id, user_id)

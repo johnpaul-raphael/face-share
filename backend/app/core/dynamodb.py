@@ -8,6 +8,7 @@ import boto3
 from botocore.exceptions import ClientError
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
+from datetime import datetime, timezone
 import json
 
 from app.core.config import settings
@@ -23,7 +24,7 @@ class DynamoDBService:
     def __init__(self):
         """Initialize DynamoDB client and table reference."""
         self.client = boto3.client('dynamodb', region_name=settings.AWS_REGION)
-        self.table_name = 'FaceShareData'
+        self.table_name = settings.AWS_DYNAMODB_TABLE_NAME
         self.resource = boto3.resource('dynamodb', region_name=settings.AWS_REGION)
         self.table = self.resource.Table(self.table_name)
     
@@ -31,7 +32,8 @@ class DynamoDBService:
     # USER OPERATIONS
     # ==========================================
     
-    def create_user(self, user_id: str, email: str, name: str, **kwargs) -> bool:
+    def create_user(self, user_id: str, email: str, name: str, 
+                    hashed_password: str = None, **kwargs) -> bool:
         """
         Create a new user in DynamoDB.
         
@@ -39,12 +41,15 @@ class DynamoDBService:
             user_id: UUID of the user
             email: User's email address
             name: User's full name
+            hashed_password: Bcrypt hashed password
             **kwargs: Additional user attributes
         
         Returns:
             True if successful, False otherwise
         """
         try:
+            now = datetime.now(timezone.utc).isoformat()
+            
             item = {
                 'PK': f'USER#{user_id}',
                 'SK': 'PROFILE',
@@ -53,16 +58,22 @@ class DynamoDBService:
                 'user_id': user_id,
                 'email': email,
                 'name': name,
+                'hashed_password': hashed_password,
                 'entity_type': 'USER',
+                'created_at': now,
+                'updated_at': now,
                 **kwargs
             }
             
+            # Remove None values (but keep empty strings and False)
+            item = {k: v for k, v in item.items() if v is not None}
+            
             self.table.put_item(Item=item)
-            print(f"✅ Created user: {user_id}")
+            print(f"[db] Created user: {user_id}")
             return True
             
         except ClientError as e:
-            print(f"❌ Error creating user: {e}")
+            print(f"[db] Error creating user: {e}")
             return False
     
     def get_user_by_id(self, user_id: str) -> Optional[Dict]:
@@ -76,7 +87,7 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"❌ Error getting user: {e}")
+            print(f"[db] Error getting user: {e}")
             return None
     
     def get_user_by_email(self, email: str) -> Optional[Dict]:
@@ -93,7 +104,7 @@ class DynamoDBService:
             items = response.get('Items', [])
             return items[0] if items else None
         except ClientError as e:
-            print(f"❌ Error getting user by email: {e}")
+            print(f"[db] Error getting user by email: {e}")
             return None
     
     # ==========================================
@@ -119,11 +130,11 @@ class DynamoDBService:
             }
             
             self.table.put_item(Item=item)
-            print(f"✅ Created face profile: {image_id}")
+            print(f"[db] Created face profile: {image_id}")
             return True
             
         except ClientError as e:
-            print(f"❌ Error creating face profile: {e}")
+            print(f"[db] Error creating face profile: {e}")
             return False
     
     def get_user_face_profiles(self, user_id: str) -> List[Dict]:
@@ -138,7 +149,7 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"❌ Error getting face profiles: {e}")
+            print(f"[db] Error getting face profiles: {e}")
             return []
     
     # ==========================================
@@ -162,11 +173,11 @@ class DynamoDBService:
             }
             
             self.table.put_item(Item=item)
-            print(f"✅ Created event: {event_id}")
+            print(f"[db] Created event: {event_id}")
             return True
             
         except ClientError as e:
-            print(f"❌ Error creating event: {e}")
+            print(f"[db] Error creating event: {e}")
             return False
     
     def get_event(self, event_id: str) -> Optional[Dict]:
@@ -180,7 +191,7 @@ class DynamoDBService:
             )
             return response.get('Item')
         except ClientError as e:
-            print(f"❌ Error getting event: {e}")
+            print(f"[db] Error getting event: {e}")
             return None
     
     def get_user_events(self, user_id: str) -> List[Dict]:
@@ -189,14 +200,16 @@ class DynamoDBService:
             response = self.table.query(
                 IndexName='GSI1',
                 KeyConditionExpression='GSI1PK = :pk AND begins_with(GSI1SK, :sk)',
+                FilterExpression='entity_type = :type',
                 ExpressionAttributeValues={
                     ':pk': f'USER#{user_id}',
-                    ':sk': 'EVENT#'
+                    ':sk': 'EVENT#',
+                    ':type': 'EVENT',
                 }
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"❌ Error getting user events: {e}")
+            print(f"[db] Error getting user events: {e}")
             return []
     
     # ==========================================
@@ -220,11 +233,11 @@ class DynamoDBService:
             }
             
             self.table.put_item(Item=item)
-            print(f"✅ Added participant {user_id} to event {event_id}")
+            print(f"[db] Added participant {user_id} to event {event_id}")
             return True
             
         except ClientError as e:
-            print(f"❌ Error adding participant: {e}")
+            print(f"[db] Error adding participant: {e}")
             return False
     
     def get_event_participants(self, event_id: str) -> List[Dict]:
@@ -239,7 +252,7 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"❌ Error getting participants: {e}")
+            print(f"[db] Error getting participants: {e}")
             return []
     
     # ==========================================
@@ -265,11 +278,11 @@ class DynamoDBService:
             }
             
             self.table.put_item(Item=item)
-            print(f"✅ Created photo: {photo_id}")
+            print(f"[db] Created photo: {photo_id}")
             return True
             
         except ClientError as e:
-            print(f"❌ Error creating photo: {e}")
+            print(f"[db] Error creating photo: {e}")
             return False
     
     def get_event_photos(self, event_id: str) -> List[Dict]:
@@ -284,7 +297,7 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"❌ Error getting photos: {e}")
+            print(f"[db] Error getting photos: {e}")
             return []
     
     # ==========================================
@@ -310,11 +323,11 @@ class DynamoDBService:
             }
             
             self.table.put_item(Item=item)
-            print(f"✅ Created face match: {match_id}")
+            print(f"[db] Created face match: {match_id}")
             return True
             
         except ClientError as e:
-            print(f"❌ Error creating face match: {e}")
+            print(f"[db] Error creating face match: {e}")
             return False
     
     def get_photo_matches(self, photo_id: str) -> List[Dict]:
@@ -329,7 +342,7 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"❌ Error getting photo matches: {e}")
+            print(f"[db] Error getting photo matches: {e}")
             return []
     
     def get_user_photos(self, user_id: str) -> List[Dict]:
@@ -345,8 +358,356 @@ class DynamoDBService:
             )
             return response.get('Items', [])
         except ClientError as e:
-            print(f"❌ Error getting user photos: {e}")
+            print(f"[db] Error getting user photos: {e}")
             return []
+
+
+    # ==========================================
+    # INTERNAL HELPERS
+    # ==========================================
+
+    def _build_update_expression(self, updates: dict) -> tuple:
+        """Build DynamoDB UpdateExpression from a dict of updates.
+
+        Returns (UpdateExpression, ExpressionAttributeNames, ExpressionAttributeValues).
+        All keys are aliased with #k to avoid reserved-word conflicts.
+        """
+        set_parts = []
+        names = {}
+        values = {}
+        now = datetime.now(timezone.utc).isoformat()
+        updates['updated_at'] = now
+        for i, (key, value) in enumerate(updates.items()):
+            alias = f"#k{i}"
+            val_alias = f":v{i}"
+            names[alias] = key
+            values[val_alias] = value
+            set_parts.append(f"{alias} = {val_alias}")
+        expression = "SET " + ", ".join(set_parts)
+        return expression, names, values
+
+    # ==========================================
+    # USER UPDATE
+    # ==========================================
+
+    def update_user(self, user_id: str, **updates) -> bool:
+        """Update user attributes."""
+        try:
+            expr, names, values = self._build_update_expression(updates)
+            self.table.update_item(
+                Key={'PK': f'USER#{user_id}', 'SK': 'PROFILE'},
+                UpdateExpression=expr,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error updating user: {e}")
+            return False
+
+    # ==========================================
+    # FACE PROFILE CRUD
+    # ==========================================
+
+    def get_face_profile_image(self, user_id: str, image_id: str) -> Optional[Dict]:
+        """Get a single face profile image record."""
+        try:
+            response = self.table.get_item(
+                Key={'PK': f'USER#{user_id}', 'SK': f'FACE#{image_id}'}
+            )
+            return response.get('Item')
+        except ClientError as e:
+            print(f"[db] Error getting face profile image: {e}")
+            return None
+
+    def update_face_profile(self, user_id: str, image_id: str, **updates) -> bool:
+        """Update a face profile image record."""
+        try:
+            expr, names, values = self._build_update_expression(updates)
+            self.table.update_item(
+                Key={'PK': f'USER#{user_id}', 'SK': f'FACE#{image_id}'},
+                UpdateExpression=expr,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error updating face profile: {e}")
+            return False
+
+    def delete_face_profile(self, user_id: str, image_id: str) -> bool:
+        """Delete a face profile image record."""
+        try:
+            self.table.delete_item(
+                Key={'PK': f'USER#{user_id}', 'SK': f'FACE#{image_id}'}
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error deleting face profile: {e}")
+            return False
+
+    # ==========================================
+    # EVENT UPDATE / DELETE / JOIN CODE
+    # ==========================================
+
+    def update_event(self, event_id: str, **updates) -> bool:
+        """Update event metadata."""
+        try:
+            expr, names, values = self._build_update_expression(updates)
+            self.table.update_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': 'METADATA'},
+                UpdateExpression=expr,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error updating event: {e}")
+            return False
+
+    def delete_event(self, event_id: str) -> bool:
+        """Delete an event metadata record."""
+        try:
+            self.table.delete_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': 'METADATA'}
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error deleting event: {e}")
+            return False
+
+    def create_join_code_lookup(self, join_code: str, event_id: str) -> bool:
+        """Store a join-code -> event_id lookup record."""
+        try:
+            self.table.put_item(Item={
+                'PK': f'JOINCODE#{join_code}',
+                'SK': 'LOOKUP',
+                'event_id': event_id,
+                'entity_type': 'JOIN_CODE',
+            })
+            return True
+        except ClientError as e:
+            print(f"[db] Error creating join code lookup: {e}")
+            return False
+
+    def delete_join_code_lookup(self, join_code: str) -> bool:
+        """Delete a join-code lookup record."""
+        try:
+            self.table.delete_item(
+                Key={'PK': f'JOINCODE#{join_code}', 'SK': 'LOOKUP'}
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error deleting join code lookup: {e}")
+            return False
+
+    def get_event_by_join_code(self, join_code: str) -> Optional[Dict]:
+        """Look up an event by its join code. Returns the full event item or None."""
+        try:
+            response = self.table.get_item(
+                Key={'PK': f'JOINCODE#{join_code}', 'SK': 'LOOKUP'}
+            )
+            item = response.get('Item')
+            if not item:
+                return None
+            return self.get_event(item['event_id'])
+        except ClientError as e:
+            print(f"[db] Error looking up join code: {e}")
+            return None
+
+    def get_events_user_joined(self, user_id: str) -> List[Dict]:
+        """Get all events where user is a participant (not owner). Uses GSI1."""
+        try:
+            response = self.table.query(
+                IndexName='GSI1',
+                KeyConditionExpression='GSI1PK = :pk AND begins_with(GSI1SK, :sk)',
+                FilterExpression='entity_type = :type',
+                ExpressionAttributeValues={
+                    ':pk': f'USER#{user_id}',
+                    ':sk': 'EVENT#',
+                    ':type': 'PARTICIPANT',
+                }
+            )
+            participant_items = response.get('Items', [])
+            events = []
+            for item in participant_items:
+                event = self.get_event(item['event_id'])
+                if event:
+                    events.append(event)
+            return events
+        except ClientError as e:
+            print(f"[db] Error getting joined events: {e}")
+            return []
+
+    # ==========================================
+    # PARTICIPANT CRUD
+    # ==========================================
+
+    def get_participant(self, event_id: str, user_id: str) -> Optional[Dict]:
+        """Get a single participant record."""
+        try:
+            response = self.table.get_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'USER#{user_id}'}
+            )
+            return response.get('Item')
+        except ClientError as e:
+            print(f"[db] Error getting participant: {e}")
+            return None
+
+    def update_participant(self, event_id: str, user_id: str, **updates) -> bool:
+        """Update arbitrary participant attributes."""
+        try:
+            expr, names, values = self._build_update_expression(updates)
+            self.table.update_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'USER#{user_id}'},
+                UpdateExpression=expr,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error updating participant: {e}")
+            return False
+
+    def update_participant_status(self, event_id: str, user_id: str, status: str) -> bool:
+        """Update participant status."""
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            self.table.update_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'USER#{user_id}'},
+                UpdateExpression='SET #s = :s, updated_at = :u',
+                ExpressionAttributeNames={'#s': 'status'},
+                ExpressionAttributeValues={':s': status, ':u': now},
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error updating participant status: {e}")
+            return False
+
+    def delete_participant(self, event_id: str, user_id: str) -> bool:
+        """Remove a participant from an event."""
+        try:
+            self.table.delete_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'USER#{user_id}'}
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error deleting participant: {e}")
+            return False
+
+    # ==========================================
+    # PHOTO CRUD
+    # ==========================================
+
+    def get_photo(self, event_id: str, photo_id: str) -> Optional[Dict]:
+        """Get a photo record."""
+        try:
+            response = self.table.get_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'PHOTO#{photo_id}'}
+            )
+            return response.get('Item')
+        except ClientError as e:
+            print(f"[db] Error getting photo: {e}")
+            return None
+
+    def update_photo(self, event_id: str, photo_id: str, **updates) -> bool:
+        """Update a photo record."""
+        try:
+            expr, names, values = self._build_update_expression(updates)
+            self.table.update_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'PHOTO#{photo_id}'},
+                UpdateExpression=expr,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error updating photo: {e}")
+            return False
+
+    def delete_photo(self, event_id: str, photo_id: str) -> bool:
+        """Delete a photo record."""
+        try:
+            self.table.delete_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'PHOTO#{photo_id}'}
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error deleting photo: {e}")
+            return False
+
+    # ==========================================
+    # MATCH CRUD
+    # ==========================================
+
+    def get_match(self, photo_id: str, match_id: str) -> Optional[Dict]:
+        """Get a face match record."""
+        try:
+            response = self.table.get_item(
+                Key={'PK': f'PHOTO#{photo_id}', 'SK': f'MATCH#{match_id}'}
+            )
+            return response.get('Item')
+        except ClientError as e:
+            print(f"[db] Error getting match: {e}")
+            return None
+
+    def update_match(self, photo_id: str, match_id: str, **updates) -> bool:
+        """Update a face match record."""
+        try:
+            expr, names, values = self._build_update_expression(updates)
+            self.table.update_item(
+                Key={'PK': f'PHOTO#{photo_id}', 'SK': f'MATCH#{match_id}'},
+                UpdateExpression=expr,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error updating match: {e}")
+            return False
+
+    def delete_match(self, photo_id: str, match_id: str) -> bool:
+        """Delete a face match record."""
+        try:
+            self.table.delete_item(
+                Key={'PK': f'PHOTO#{photo_id}', 'SK': f'MATCH#{match_id}'}
+            )
+            return True
+        except ClientError as e:
+            print(f"[db] Error deleting match: {e}")
+            return False
+
+    def get_user_photos_with_details(self, user_id: str) -> List[Dict]:
+        """Get all face match records for a user via GSI1."""
+        try:
+            response = self.table.query(
+                IndexName='GSI1',
+                KeyConditionExpression='GSI1PK = :pk AND begins_with(GSI1SK, :sk)',
+                ExpressionAttributeValues={
+                    ':pk': f'USER#{user_id}',
+                    ':sk': 'MATCH#',
+                }
+            )
+            return response.get('Items', [])
+        except ClientError as e:
+            print(f"[db] Error getting user photo matches: {e}")
+            return []
+
+    def get_photo_match_count(self, photo_id: str) -> int:
+        """Count matches for a photo."""
+        try:
+            response = self.table.query(
+                KeyConditionExpression='PK = :pk AND begins_with(SK, :sk)',
+                Select='COUNT',
+                ExpressionAttributeValues={
+                    ':pk': f'PHOTO#{photo_id}',
+                    ':sk': 'MATCH#',
+                }
+            )
+            return response.get('Count', 0)
+        except ClientError as e:
+            print(f"[db] Error counting photo matches: {e}")
+            return 0
 
 
 # Singleton instance

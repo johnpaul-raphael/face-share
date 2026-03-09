@@ -2,8 +2,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.api import auth, users, events, participants, images, deepface
+from app.api import auth, users, events, participants, images
 import logging
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +28,14 @@ def _cors_headers_for_request(request: Request) -> dict:
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Ensure 500 responses include CORS headers so the frontend sees the real error."""
-    logger.exception("Unhandled exception: %s", exc)
+    print(f"\n{'='*60}")
+    print(f"500 ERROR  {request.method} {request.url}")
+    print(f"{'='*60}")
+    traceback.print_exc()
+    print(f"{'='*60}\n")
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"detail": str(exc) or "Internal server error"},
         headers=_cors_headers_for_request(request),
     )
 
@@ -53,15 +58,15 @@ app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["u
 app.include_router(events.router, prefix=f"{settings.API_V1_STR}/events", tags=["events"])
 app.include_router(participants.router, prefix=f"{settings.API_V1_STR}", tags=["participants"])
 app.include_router(images.router, prefix=f"{settings.API_V1_STR}/images", tags=["images"])
-app.include_router(deepface.router, prefix=f"{settings.API_V1_STR}/deepface", tags=["deepface"])
-
+# Event photos and match management routes live under /api/v1 directly
+app.include_router(images.router, prefix=f"{settings.API_V1_STR}", tags=["photos"])
 
 @app.get("/")
 async def root():
     return {
         "message": "FaceShare API",
         "version": settings.VERSION,
-        "docs": f"{settings.API_V1_STR}/docs"
+        "docs": "/docs"
     }
 
 

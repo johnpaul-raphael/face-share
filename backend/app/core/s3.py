@@ -131,7 +131,7 @@ def generate_presigned_upload_url(
         
     except ClientError as e:
         # Log error and return None if generation fails
-        print(f"❌ Error generating presigned upload URL: {e}")
+        print(f"[ERROR] Error generating presigned upload URL: {e}")
         return None
 
 
@@ -180,7 +180,7 @@ def generate_presigned_download_url(
         
     except ClientError as e:
         # Log error and return None if generation fails
-        print(f"❌ Error generating presigned download URL: {e}")
+        print(f"[ERROR] Error generating presigned download URL: {e}")
         return None
 
 
@@ -217,12 +217,12 @@ def delete_s3_object(key: str) -> bool:
             Bucket=settings.S3_BUCKET_NAME,
             Key=key
         )
-        print(f"✅ Deleted S3 object: {key}")
+        print(f"[OK] Deleted S3 object: {key}")
         return True
         
     except ClientError as e:
         # Log error and return False if deletion fails
-        print(f"❌ Error deleting S3 object: {e}")
+        print(f"[ERROR] Error deleting S3 object: {e}")
         return False
 
 
@@ -248,7 +248,7 @@ def check_s3_object_exists(key: str) -> bool:
     except ClientError as e:
         if e.response['Error']['Code'] == '404':
             return False
-        print(f"❌ Error checking S3 object: {e}")
+        print(f"[ERROR] Error checking S3 object: {e}")
         return False
 
 
@@ -377,7 +377,7 @@ def extract_s3_key_from_url(s3_url: str) -> Optional[str]:
         return None
         
     except Exception as e:
-        print(f"❌ Error extracting S3 key from URL: {e}")
+        print(f"[ERROR] Error extracting S3 key from URL: {e}")
         return None
 
 
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     
     python -m app.core.s3
     """
-    print("🔧 Testing S3 Configuration...")
+    print("[CONFIG] Testing S3 Configuration...")
     print(f"Bucket: {settings.S3_BUCKET_NAME}")
     print(f"Region: {settings.AWS_REGION}")
     print(f"Environment: {settings.ENVIRONMENT}")
@@ -405,8 +405,8 @@ if __name__ == "__main__":
     url = generate_presigned_upload_url(test_key)
     
     if url:
-        print("✅ Success! URL generated (first 100 chars):")
+        print("[OK] Success! URL generated (first 100 chars):")
         print(f"{url[:100]}...")
     else:
-        print("❌ Failed to generate URL")
+        print("[ERROR] Failed to generate URL")
         print("Check your AWS credentials in .env file")

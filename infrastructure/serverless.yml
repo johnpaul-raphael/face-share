@@ -1,31 +1,24 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
+org: faceshare
+app: faceshare-api
 service: faceshare-lambda
 
 provider:
   name: aws
-  runtime: python3.11
+  runtime: python3.12
   stage: ${opt:stage, 'dev'}
-  region: us-east-1
+  region: ${opt:region, 'us-east-1'}
   memorySize: 128
   timeout: 30
   environment:
-    DYNAMODB_TABLE: FaceShareData
-    REKOGNITION_COLLECTION: faceshare-collection
-    S3_BUCKET: faceshare-events
+    AWS_DYNAMODB_TABLE_NAME: FaceShareData
+    REKOGNITION_COLLECTION_ID: faceshare-collection
+    S3_BUCKET_NAME: ${env:S3_BUCKET_NAME, 'faceshare-events'}
     SQS_QUEUE_URL: !Ref PhotoProcessingQueue
-  
+    SECRET_KEY: ${env:SECRET_KEY}
+    GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
+    CORS_ORIGINS: ${env:CORS_ORIGINS, '*'}
+    ENVIRONMENT: production
+
   iam:
     role:
       statements:
@@ -33,45 +26,73 @@ provider:
           Action:
             - s3:GetObject
             - s3:PutObject
-          Resource: "arn:aws:s3:::faceshare-events/*"
+            - s3:DeleteObject
+          Resource: "arn:aws:s3:::${env:S3_BUCKET_NAME, 'faceshare-events'}/*"
         - Effect: Allow
           Action:
             - dynamodb:GetItem
             - dynamodb:PutItem
             - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
             - dynamodb:Query
-          Resource: "arn:aws:dynamodb:us-east-1:*:table/FaceShareData"
+            - dynamodb:Scan
+          Resource:
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/FaceShareData"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/FaceShareData/index/*"
         - Effect: Allow
           Action:
             - rekognition:IndexFaces
             - rekognition:SearchFacesByImage
             - rekognition:DetectFaces
+            - rekognition:DeleteFaces
+            - rekognition:CreateCollection
+            - rekognition:ListFaces
           Resource: "*"
         - Effect: Allow
           Action:
             - sqs:SendMessage
             - sqs:ReceiveMessage
             - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
           Resource: !GetAtt PhotoProcessingQueue.Arn
 
 plugins:
   - serverless-python-requirements
+  - serverless-offline
 
 custom:
   pythonRequirements:
+    pythonBin: python
     dockerizePip: false
     slim: true
+    fileName: ../backend/requirements.txt
 
 package:
-  individually: true
+  individually: false
   exclude:
     - node_modules/**
     - .git/**
     - .gitignore
     - README.md
+    - backend/venv/**
+    - backend/dataset/**
+    - backend/event_uploads/**
 
 functions:
-  # API: Index face (profile photo)
+  # FastAPI backend (all REST API routes)
+  api:
+    handler: ../backend/lambda_handler.handler
+    memorySize: 256
+    timeout: 30
+    events:
+      - httpApi:
+          path: /
+          method: ANY
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+  # Index face into Rekognition (called directly by confirm-upload API)
   indexFace:
     handler: lambda/index_face.lambda_handler
     memorySize: 256
@@ -81,18 +102,17 @@ functions:
           path: /faces/index
           method: post
 
-  # Trigger: Queue photo on S3 upload
+  # Trigger: Queue photo on S3 upload (any image type under events/)
   queuePhoto:
     handler: lambda/queue_photo.lambda_handler
     memorySize: 128
     timeout: 5
     events:
       - s3:
-          bucket: faceshare-events
+          bucket: ${env:S3_BUCKET_NAME, 'faceshare-events'}
           event: s3:ObjectCreated:*
           rules:
             - prefix: events/
-            - suffix: .jpg
 
   # Worker: Process photos from queue
   processPhoto:
@@ -116,7 +136,7 @@ resources:
         RedrivePolicy:
           deadLetterTargetArn: !GetAtt PhotoProcessingDLQ.Arn
           maxReceiveCount: 3
-    
+
     PhotoProcessingDLQ:
       Type: AWS::SQS::Queue
       Properties:
@@ -124,9 +144,9 @@ resources:
 
   Outputs:
     ApiEndpoint:
-      Description: API Gateway endpoint
+      Description: API Gateway endpoint URL
       Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/'
-    
+
     ProcessingQueueUrl:
-      Description: SQS Queue URL
+      Description: SQS Queue URL for photo processing
       Value: !Ref PhotoProcessingQueue

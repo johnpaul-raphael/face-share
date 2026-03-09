@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python test_face_upload.py)",
+      "Bash(python -c \"import sys; sys.stdout.reconfigure(encoding=''utf-8''); from app.core.config import settings; print(f''CORS_ORIGINS: {settings.CORS_ORIGINS}'')\")",
+      "Bash(test -f .env)",
+      "Bash(test -f backend/.env)",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

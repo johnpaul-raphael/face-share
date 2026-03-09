@@ -1,20 +1,17 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
 from uuid import UUID
-from app.database.session import get_db
-from app.database.models import User
 from app.core.security import decode_token, get_user_id_from_token
+from app.services.dynamodb_auth_service import get_user_by_id
 from typing import Optional
 
 security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
-) -> User:
-    """Get the current authenticated user."""
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get the current authenticated user using DynamoDB."""
     token = credentials.credentials
     user_id_str = get_user_id_from_token(token)
     
@@ -25,16 +22,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    try:
-        user_id = UUID(user_id_str)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user ID in token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user = db.query(User).filter(User.id == user_id).first()
+    # Get user from DynamoDB
+    user = get_user_by_id(user_id_str)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -46,14 +35,13 @@ async def get_current_user(
 
 
 async def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    db: Session = Depends(get_db)
-) -> Optional[User]:
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
+):
     """Get the current user if authenticated, otherwise None."""
     if not credentials:
         return None
     
     try:
-        return await get_current_user(credentials, db)
+        return await get_current_user(credentials)
     except HTTPException:
         return None
