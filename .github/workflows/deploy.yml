@@ -63,6 +63,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          AWS_DYNAMODB_TABLE_NAME: ${{ secrets.AWS_DYNAMODB_TABLE_NAME }}
 
   # ─── Job 2: Frontend lint + typecheck ────────────────────────────────────────
   frontend-ci:
