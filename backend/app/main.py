@@ -61,6 +61,7 @@ app.include_router(images.router, prefix=f"{settings.API_V1_STR}/images", tags=[
 # Event photos and match management routes live under /api/v1 directly
 app.include_router(images.router, prefix=f"{settings.API_V1_STR}", tags=["photos"])
 
+
 @app.get("/")
 async def root():
     return {
