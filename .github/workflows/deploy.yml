@@ -1,9 +1,8 @@
 name: CI/CD Pipeline
 
 on:
-  # Auto-deploy on merge to develop (always dev stage)
+  # Run CI on every push
   push:
-    branches: [develop]
 
   # Manual deploy with environment choice
   workflow_dispatch:
@@ -31,9 +30,8 @@ on:
 permissions:
   contents: read
 
-# Resolve the stage: manual runs use the input, auto runs always use 'dev'
 env:
-  STAGE: ${{ github.event.inputs.environment || 'dev' }}
+  STAGE: ${{ github.event.inputs.environment || 'prod' }}
 
 jobs:
   # ─── Job 1: Backend lint + tests ────────────────────────────────────────────
@@ -93,7 +91,7 @@ jobs:
     name: Deploy Backend (Lambda)
     runs-on: ubuntu-latest
     needs: [backend-ci]
-    if: github.event.inputs.deploy_backend == 'true' || github.event_name != 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_backend == 'true'
     environment: ${{ github.event.inputs.environment || 'dev' }}
     permissions:
       contents: read
@@ -130,7 +128,7 @@ jobs:
     name: Deploy Frontend (Vercel)
     runs-on: ubuntu-latest
     needs: [frontend-ci]
-    if: github.event.inputs.deploy_frontend == 'true' || github.event_name != 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_frontend == 'true'
     permissions:
       contents: read
     steps:
