@@ -1,6 +1,5 @@
-org: faceshare
-app: faceshare-api
 service: faceshare-lambda
+frameworkVersion: "3"
 
 provider:
   name: aws
