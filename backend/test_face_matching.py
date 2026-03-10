@@ -6,12 +6,14 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import pytest
 from app.core.rekognition import RekognitionService
 from app.core.dynamodb import DynamoDBService
 from app.core.config import settings
 import uuid
 
 
+@pytest.mark.skip(reason="Manual/interactive test — requires S3 upload and stdin")
 def test_complete_flow():
     """Test complete face matching flow."""
     

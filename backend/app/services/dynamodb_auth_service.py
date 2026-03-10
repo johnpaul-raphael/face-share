@@ -16,7 +16,6 @@ class DynamoDBUser:
         self.id = item.get('user_id')
         self.email = item.get('email')
         self.name = item.get('name')
-        self.hashed_password = item.get('hashed_password')
         self.avatar_url = item.get('avatar_url')
         self.created_at = item.get('created_at')
         self.updated_at = item.get('updated_at')
