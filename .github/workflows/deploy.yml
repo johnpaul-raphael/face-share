@@ -93,8 +93,7 @@ jobs:
     name: Deploy Backend (Lambda)
     runs-on: ubuntu-latest
     needs: [backend-ci]
-    # Use 'false' string comparison — workflow_dispatch booleans arrive as strings
-    if: github.event.inputs.deploy_backend != 'false'
+    if: github.event.inputs.deploy_backend == 'true' || github.event_name != 'workflow_dispatch'
     environment: ${{ github.event.inputs.environment || 'dev' }}
     permissions:
       contents: read
@@ -131,7 +130,7 @@ jobs:
     name: Deploy Frontend (Vercel)
     runs-on: ubuntu-latest
     needs: [frontend-ci]
-    if: github.event.inputs.deploy_frontend != 'false'
+    if: github.event.inputs.deploy_frontend == 'true' || github.event_name != 'workflow_dispatch'
     permissions:
       contents: read
     steps:

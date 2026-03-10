@@ -172,7 +172,6 @@ class Settings(BaseSettings):
         return self
 
 
-
 def get_environment_file() -> str:
     """
     Determine which .env file to load based on environment.
