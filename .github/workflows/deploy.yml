@@ -107,12 +107,12 @@ jobs:
           python-version: "3.12"
 
       - name: Install Serverless dependencies
-        run: npm install
+        run: npm install && chmod +x node_modules/.bin/serverless
         working-directory: infrastructure
 
       - name: Deploy
         # Reference $SERVERLESS_STAGE as a shell variable (not ${{ }}) to prevent script injection
-        run: npx serverless deploy --stage "$SERVERLESS_STAGE"
+        run: node_modules/.bin/serverless deploy --stage "$SERVERLESS_STAGE"
         working-directory: infrastructure
         env:
           SERVERLESS_STAGE: ${{ env.STAGE }}
