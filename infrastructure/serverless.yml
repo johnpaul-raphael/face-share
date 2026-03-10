@@ -8,6 +8,26 @@ provider:
   region: ${opt:region, 'us-east-1'}
   memorySize: 128
   timeout: 30
+  httpApi:
+    cors:
+      allowedOrigins:
+        - https://face-share.vercel.app
+        - http://localhost:3000
+        - http://localhost:9002
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+        - Accept
+        - Origin
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowCredentials: false
+      maxAge: 300
   environment:
     AWS_DYNAMODB_TABLE_NAME: FaceShareData
     REKOGNITION_COLLECTION_ID: faceshare-collection
