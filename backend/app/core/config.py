@@ -8,11 +8,7 @@ Usage:
     from app.core.config import settings
 
     # Access configuration
-    db_url = settings.DATABASE_URL
-
-    # Check environment
-    if settings.is_development:
-        logger.debug("Running in development mode")
+    api_url = settings.API_V1_STR
 
 Environment Files:
     - .env          : Local development (default)
@@ -174,24 +170,6 @@ class Settings(BaseSettings):
             # Already a list, ensure all items are strings and stripped
             self.CORS_ORIGINS = [str(origin).strip() for origin in self.CORS_ORIGINS if origin]
         return self
-
-    # ==========================================
-    # HELPER PROPERTIES
-    # ==========================================
-    @property
-    def is_development(self) -> bool:
-        """Check if running in development environment"""
-        return self.ENVIRONMENT.lower() == "development"
-
-    @property
-    def is_qa(self) -> bool:
-        """Check if running in QA/staging environment"""
-        return self.ENVIRONMENT.lower() == "qa"
-
-    @property
-    def is_production(self) -> bool:
-        """Check if running in production environment"""
-        return self.ENVIRONMENT.lower() == "production"
 
 
 def get_environment_file() -> str:

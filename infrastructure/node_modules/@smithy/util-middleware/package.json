@@ -1,6 +1,6 @@
 {
   "name": "@smithy/util-middleware",
-  "version": "4.2.10",
+  "version": "4.2.11",
   "description": "Shared utilities for to be used in middleware packages.",
   "main": "./dist-cjs/index.js",
   "module": "./dist-es/index.js",
@@ -43,7 +43,7 @@
     "node": ">=18.0.0"
   },
   "typesVersions": {
-    "<4.0": {
+    "<4.5": {
       "types/*": [
         "types/ts3.4/*"
       ]

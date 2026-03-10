@@ -60,7 +60,8 @@ class TestConfirmFaceProfileUpload:
     def test_confirm_face_upload_success(self, client):
         rek_result = {"face_id": "rek-face-001", "confidence": 99.0}
         with patch("app.api.images.dynamodb_service") as mock_db, \
-             patch("app.api.images.rekognition_service") as mock_rek:
+             patch("app.api.images.rekognition_service") as mock_rek, \
+             patch("app.api.images.check_s3_object_exists", return_value=True):
             mock_db.get_user_face_profiles.return_value = []  # 0 existing → under limit
             mock_rek.index_face.return_value = rek_result
             mock_db.create_face_profile.return_value = True

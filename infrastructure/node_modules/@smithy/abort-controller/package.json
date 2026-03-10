@@ -1,6 +1,6 @@
 {
   "name": "@smithy/abort-controller",
-  "version": "4.2.10",
+  "version": "4.2.11",
   "description": "A simple abort controller library",
   "main": "./dist-cjs/index.js",
   "module": "./dist-es/index.js",
@@ -33,7 +33,7 @@
     "node": ">=18.0.0"
   },
   "typesVersions": {
-    "<4.0": {
+    "<4.5": {
       "dist-types/*": [
         "dist-types/ts3.4/*"
       ]
