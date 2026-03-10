@@ -109,7 +109,7 @@ jobs:
         run: npm install -g serverless@3.38.0
 
       - name: Install Serverless plugins
-        run: npm install
+        run: npm cache clean --force && npm install
         working-directory: infrastructure
 
       - name: Deploy
