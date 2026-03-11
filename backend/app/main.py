@@ -16,12 +16,8 @@ app = FastAPI(
 
 def _cors_headers_for_request(request: Request) -> dict:
     """Build CORS headers so error responses (e.g. 500) are not blocked by the browser."""
-    origin = request.headers.get("origin")
-    if origin and origin in settings.CORS_ORIGINS:
-        return {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}
-    if settings.CORS_ORIGINS:
-        return {"Access-Control-Allow-Origin": settings.CORS_ORIGINS[0], "Access-Control-Allow-Credentials": "true"}
-    return {}
+    origin = request.headers.get("origin", "*")
+    return {"Access-Control-Allow-Origin": origin}
 
 
 @app.exception_handler(Exception)
@@ -39,12 +35,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 logger.info(f"CORS Origins: {settings.CORS_ORIGINS}")
 
 # CORS middleware - must be added before routers
+# Note: allow_origins=["*"] works because this app uses Bearer tokens (not cookies),
+# so allow_credentials must be False. API Gateway also adds CORS headers in production.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers
