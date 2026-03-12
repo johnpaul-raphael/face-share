@@ -34,16 +34,17 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Log CORS origins for debugging
 logger.info(f"CORS Origins: {settings.CORS_ORIGINS}")
 
-# CORS middleware - must be added before routers
-# Note: allow_origins=["*"] works because this app uses Bearer tokens (not cookies),
-# so allow_credentials must be False. API Gateway also adds CORS headers in production.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware — only for local dev.
+# In production (Lambda), API Gateway handles CORS via httpApi.cors in serverless.yml.
+# Adding CORSMiddleware in production would duplicate the headers API Gateway already sets.
+if settings.ENVIRONMENT != "production":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Include routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
