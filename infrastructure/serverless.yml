@@ -68,19 +68,26 @@ custom:
 
 package:
   individually: false
-  exclude:
-    - node_modules/**
-    - .git/**
-    - .gitignore
-    - README.md
-    - backend/venv/**
-    - backend/dataset/**
-    - backend/event_uploads/**
+  patterns:
+    - '!node_modules/**'
+    - '!.git/**'
+    - '!.gitignore'
+    - '!README.md'
+    - '!package.json'
+    - '!package-lock.json'
+    - '!handler.py'
+    - '!cors.json'
+    - '!lifecycle.json'
+    - '!**/__pycache__/**'
+    - '!**/*.pyc'
+    - '!venv/**'
+    - '!tests/**'
 
 functions:
   # FastAPI backend (all REST API routes)
+  # lambda_handler.py and app/ are copied from ../backend/ by CI before deploy
   api:
-    handler: ../backend/lambda_handler.handler
+    handler: lambda_handler.handler
     memorySize: 256
     timeout: 30
     events:
