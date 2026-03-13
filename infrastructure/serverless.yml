@@ -63,7 +63,7 @@ custom:
   pythonRequirements:
     pythonBin: python
     dockerizePip: false
-    slim: true
+    slim: false
     fileName: ../backend/requirements.txt
 
 package:
