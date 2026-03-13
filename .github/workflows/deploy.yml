@@ -112,6 +112,11 @@ jobs:
         run: npm cache clean --force && npm install
         working-directory: infrastructure
 
+      - name: Copy backend source into infrastructure for packaging
+        run: |
+          cp backend/lambda_handler.py infrastructure/
+          cp -r backend/app infrastructure/
+
       - name: Deploy
         # Reference $SERVERLESS_STAGE as a shell variable (not ${{ }}) to prevent script injection
         run: serverless deploy --stage "$SERVERLESS_STAGE"

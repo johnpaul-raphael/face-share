@@ -23,3 +23,5 @@ var/
 # Node
 node_modules/
 package-lock.json
+infrastructure/lambda_handler.py
+infrastructure/app/
