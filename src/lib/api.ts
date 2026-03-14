@@ -162,16 +162,36 @@ export class ApiClient {
   }
 
   async uploadToS3(uploadUrl: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+    console.log('[S3 Upload] Starting PUT', {
+      endpoint: uploadUrl.split('?')[0],
+      fileType: file.type,
+      fileSize: file.size,
+    });
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', uploadUrl);
-      xhr.setRequestHeader('Content-Type', file.type);
+      // Content-Type is intentionally NOT included in the presigned URL signature,
+      // so we don't set it here to avoid any header-signature mismatch on S3's side.
       if (onProgress) {
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
         });
       }
-      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`S3 upload failed: ${xhr.status}`)));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          console.log('[S3 Upload] Success', xhr.status);
+          resolve();
+        } else {
+          // Log full S3 error XML for debugging
+          console.error('[S3 Upload] FAILED', xhr.status, xhr.responseText);
+          // Parse S3 XML error code if present
+          const codeMatch = xhr.responseText.match(/<Code>([^<]+)<\/Code>/);
+          const msgMatch  = xhr.responseText.match(/<Message>([^<]+)<\/Message>/);
+          const code = codeMatch ? codeMatch[1] : xhr.status.toString();
+          const msg  = msgMatch  ? msgMatch[1]  : '';
+          reject(new Error(`S3 upload failed: ${code}${msg ? ` — ${msg}` : ''}`));
+        }
+      };
       xhr.onerror = () => reject(new Error('S3 upload network error'));
       xhr.send(file);
     });

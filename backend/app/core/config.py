@@ -37,6 +37,11 @@ from typing import Optional, Any
 from pydantic import model_validator
 import json
 import os
+import pathlib
+
+# Absolute path to backend/.env — works regardless of CWD where uvicorn is started
+_BACKEND_DIR = pathlib.Path(__file__).parent.parent.parent
+_DEFAULT_ENV_FILE = str(_BACKEND_DIR / ".env")
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +141,10 @@ class Settings(BaseSettings):
     # PYDANTIC CONFIGURATION
     # ==========================================
     model_config = SettingsConfigDict(
-        env_file=".env",  # Default env file to load
-        env_file_encoding='utf-8',  # File encoding
-        case_sensitive=True,  # Variable names are case-sensitive
-        extra='ignore'  # Ignore extra variables in .env
+        env_file=_DEFAULT_ENV_FILE,  # Absolute path — works from any CWD
+        env_file_encoding='utf-8',
+        case_sensitive=True,
+        extra='ignore',
     )
 
     # ==========================================
@@ -195,16 +200,16 @@ def get_environment_file() -> str:
 
     if env == "qa":
         logger.debug("[config] Loading QA environment from .env.qa")
-        return ".env.qa"
+        return str(_BACKEND_DIR / ".env.qa")
     elif env in ("production", "prod"):
         logger.debug("[config] Loading Production environment from .env.prod")
-        return ".env.prod"
+        return str(_BACKEND_DIR / ".env.prod")
     elif env in ("development", "dev"):
         logger.debug("[config] Loading Development environment from .env")
-        return ".env"
+        return str(_BACKEND_DIR / ".env")
     else:
         logger.warning("[config] Unknown environment '%s', using default .env", env)
-        return ".env"
+        return str(_BACKEND_DIR / ".env")
 
 
 # ==========================================

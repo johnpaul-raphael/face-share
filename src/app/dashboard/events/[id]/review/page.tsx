@@ -27,7 +27,7 @@ export default function ReviewPage() {
       .getEventPhotos(eventId)
       // Show processed photos where no participant face was matched
       .then((all) => setPhotos(all.filter((p) => !p.is_processing && p.match_count === 0)))
-      .catch(() => toast({ variant: 'destructive', title: 'Failed to load photos' }))
+      .catch(() => toast({ variant: 'destructive', title: 'Photos unavailable', description: 'Refresh the page to try again.' }))
       .finally(() => setIsLoading(false));
   }, [eventId, toast]);
 

@@ -5,6 +5,7 @@ Handles face detection, indexing, and matching using AWS Rekognition.
 """
 
 import logging
+import os
 import boto3
 from botocore.exceptions import ClientError
 from typing import List, Dict, Optional
@@ -32,12 +33,18 @@ class RekognitionService:
             collection_id: Name of the Rekognition collection.
                            Defaults to settings.REKOGNITION_COLLECTION_ID.
         """
-        self.client = boto3.client(
-            'rekognition',
-            region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        )
+        # In Lambda, AWS_SESSION_TOKEN is injected — use default credential chain
+        # so the session token is included in requests (required for STS creds).
+        # In local dev (no AWS_SESSION_TOKEN), explicit .env credentials are used.
+        if os.environ.get('AWS_SESSION_TOKEN'):
+            self.client = boto3.client('rekognition', region_name=settings.AWS_REGION)
+        else:
+            self.client = boto3.client(
+                'rekognition',
+                region_name=settings.AWS_REGION,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            )
         self.collection_id = collection_id or settings.REKOGNITION_COLLECTION_ID
         # Ensure the collection exists at startup
         self.create_collection()

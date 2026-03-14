@@ -2,11 +2,8 @@
     "CORSRules": [
         {
             "AllowedHeaders": ["*"],
-            "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
-            "AllowedOrigins": [
-                "http://localhost:3000",
-                "http://localhost:9002"
-            ],
+            "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+            "AllowedOrigins": ["*"],
             "ExposeHeaders": ["ETag"],
             "MaxAgeSeconds": 3000
         }

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +22,7 @@ export function UserNav() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    apiClient.getCurrentUser().then(setUser).catch(() => {
-      // User not authenticated — nav renders with empty state
-    });
+    apiClient.getCurrentUser().then(setUser).catch(() => {});
   }, []);
 
   const handleLogout = () => {
@@ -37,29 +35,46 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>{initials}</AvatarFallback>
+        <motion.button
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.92 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="relative h-8 w-8 rounded-full outline-none"
+        >
+          <Avatar className="h-8 w-8 ring-2 ring-transparent hover:ring-primary/30 transition-all">
+            <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
           </Avatar>
-        </Button>
+        </motion.button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user?.name ?? '…'}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user?.email ?? ''}</p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile">Profile</Link>
+      <DropdownMenuContent
+        className="w-56"
+        align="end"
+        forceMount
+        style={{ animation: 'none' }}
+        asChild
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        >
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">{user?.name ?? '…'}</p>
+              <p className="text-xs leading-none text-muted-foreground">{user?.email ?? ''}</p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/profile">Profile</Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+            Log out
           </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-          Log out
-        </DropdownMenuItem>
+        </motion.div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
