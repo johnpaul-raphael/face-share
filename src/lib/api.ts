@@ -2,6 +2,69 @@ import { User } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+// ─── Upload quality (server-controlled via SSM) ──────────────────────────────
+
+export type ImageQuality = 'optimized' | 'original';
+
+// ─── File validation ─────────────────────────────────────────────────────────
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const MAX_EVENT_PHOTO_MB = 30;
+const MAX_FACE_PHOTO_MB = 15;
+
+/** Returns an error message string, or null if the file is valid. */
+export function validateImageFile(file: File, context: 'event' | 'face' | 'cover' = 'event'): string | null {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type.toLowerCase())) {
+    return 'Unsupported file type. Please use JPEG, PNG, WebP, or HEIC.';
+  }
+  const maxMB = context === 'face' ? MAX_FACE_PHOTO_MB : MAX_EVENT_PHOTO_MB;
+  if (file.size > maxMB * 1024 * 1024) {
+    return `File too large. Maximum size is ${maxMB} MB.`;
+  }
+  return null;
+}
+
+/**
+ * Resize + compress an image using the Canvas API before upload.
+ * Reduces file size significantly (e.g. 10 MB → ~400 KB) while keeping
+ * enough resolution for Rekognition face detection.
+ * Falls back to the original file if compression fails or runs outside a browser context.
+ */
+export async function compressImage(
+  file: File,
+  maxDimension: number,
+  quality: number,
+): Promise<File> {
+  if (typeof window === 'undefined') return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const { naturalWidth: w, naturalHeight: h } = img;
+      const scale = Math.min(1, maxDimension / Math.max(w, h));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          // Replace extension with .jpg since we always output JPEG
+          const name = file.name.replace(/\.[^.]+$/, '.jpg');
+          resolve(new File([blob], name, { type: 'image/jpeg' }));
+        },
+        'image/jpeg',
+        quality,
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+}
+
 export interface ApiError {
   detail: string;
 }
@@ -151,6 +214,7 @@ export class ApiClient {
   async getPresignedUpload(data: {
     filename: string;
     content_type?: string;
+    file_size?: number;
     event_id?: string;
     user_id?: string;
     face_image_id?: string;
@@ -222,6 +286,10 @@ export class ApiClient {
     return this.request<void>(`/events/${eventId}/photos/${photoId}`, { method: 'DELETE' });
   }
 
+  async getPhotoMatches(eventId: string, photoId: string): Promise<FaceMatchResponse[]> {
+    return this.request<FaceMatchResponse[]>(`/events/${eventId}/photos/${photoId}/matches`);
+  }
+
   async confirmMatch(eventId: string, photoId: string, matchId: string) {
     return this.request<{ status: string; match_id: string }>(
       `/events/${eventId}/photos/${photoId}/matches/${matchId}/confirm`,
@@ -247,6 +315,12 @@ export class ApiClient {
 
   async getMyPhotos(): Promise<MyPhotosGroup[]> {
     return this.request<MyPhotosGroup[]>('/users/me/photos');
+  }
+
+  // ─── App config (server-controlled) ────────────────────────────────────────
+
+  async getAppConfig(): Promise<{ image_quality: ImageQuality }> {
+    return this.request<{ image_quality: ImageQuality }>('/config');
   }
 }
 
@@ -296,6 +370,7 @@ export interface PhotoResponse {
   uploader_id: string;
   s3_key: string;
   url?: string;
+  thumbnail_url?: string;
   is_processing: boolean;
   uploaded_at?: string;
   match_count: number;
@@ -314,6 +389,17 @@ export interface FaceProfileResponse {
   images: FaceProfileImageResponse[];
   image_count: number;
   is_complete: boolean;
+}
+
+export interface FaceMatchResponse {
+  match_id: string;
+  photo_id: string;
+  user_id: string;
+  user_name?: string;
+  user_email?: string;
+  confidence: number;
+  is_confirmed: boolean;
+  created_at?: string;
 }
 
 export interface MyPhotoEntry {

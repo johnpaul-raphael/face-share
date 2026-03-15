@@ -287,6 +287,19 @@ def get_s3_key_for_event_cover(event_id: str, filename: str) -> str:
     return f"events/{event_id}/cover/{filename}"
 
 
+def get_s3_key_for_thumbnail(original_s3_key: str) -> str:
+    """
+    Derive the thumbnail S3 key from an original event photo key.
+
+    Originals: events/{event_id}/photos/{photo_id}/{filename}
+    Thumbnails: thumbs/events/{event_id}/photos/{photo_id}/{filename}
+
+    The 'thumbs/' prefix keeps thumbnails outside the 'events/' S3 trigger
+    prefix, preventing the thumbnail Lambda from triggering itself.
+    """
+    return f"thumbs/{original_s3_key}"
+
+
 # ==========================================
 # UTILITY FUNCTIONS
 # ==========================================

@@ -265,16 +265,20 @@ class DynamoDBService:
                      s3_key: str, **kwargs) -> bool:
         """Create a photo record."""
         try:
+            uploaded_at = kwargs.get('uploaded_at', datetime.utcnow().isoformat())
             item = {
                 'PK': f'EVENT#{event_id}',
                 'SK': f'PHOTO#{photo_id}',
                 'GSI1PK': f'USER#{uploader_id}',
                 'GSI1SK': f'PHOTO#{photo_id}',
+                'GSI2PK': f'EVENT#{event_id}',
+                'GSI2SK': uploaded_at,
                 'photo_id': photo_id,
                 'event_id': event_id,
                 'uploader_id': uploader_id,
                 's3_key': s3_key,
                 'is_processing': True,
+                'match_count': 0,
                 'entity_type': 'PHOTO',
                 **kwargs
             }
@@ -301,6 +305,31 @@ class DynamoDBService:
         except ClientError as e:
             logger.error("[db] Error getting photos: %s", e)
             return []
+
+    def get_event_photos_sorted(self, event_id: str) -> List[Dict]:
+        """Get all photos for an event sorted by upload date (newest first) via GSI2."""
+        try:
+            response = self.table.query(
+                IndexName='GSI2',
+                KeyConditionExpression='GSI2PK = :pk',
+                ExpressionAttributeValues={':pk': f'EVENT#{event_id}'},
+                ScanIndexForward=False,
+            )
+            return response.get('Items', [])
+        except ClientError as e:
+            logger.error("[db] Error getting sorted photos: %s", e)
+            return []
+
+    def increment_photo_match_count(self, event_id: str, photo_id: str, delta: int = 1) -> None:
+        """Atomically increment (or decrement) the match_count on a photo item."""
+        try:
+            self.table.update_item(
+                Key={'PK': f'EVENT#{event_id}', 'SK': f'PHOTO#{photo_id}'},
+                UpdateExpression='ADD match_count :delta',
+                ExpressionAttributeValues={':delta': delta},
+            )
+        except ClientError as e:
+            logger.error("[db] Error updating match_count for %s: %s", photo_id, e)
 
     # ==========================================
     # FACE MATCH OPERATIONS
