@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, Upload, Loader2, X, FileImage, Trash2, Eye, Send, Lock, Star, CheckSquare, SlidersHorizontal, CalendarDays, User } from 'lucide-react';
+import { Download, Upload, Loader2, X, FileImage, Trash2, Eye, Send, Lock, Star, CheckSquare, SlidersHorizontal, CalendarDays, User, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';

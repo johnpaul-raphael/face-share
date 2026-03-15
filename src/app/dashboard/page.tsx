@@ -402,7 +402,7 @@ export default function DashboardPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search events…"
-            className="w-full rounded-xl border bg-background/60 backdrop-blur-sm py-2.5 pl-10 pr-10 text-sm outline-none ring-0 transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
+            className="w-full rounded-xl border bg-background/60 backdrop-blur-sm py-2.5 pl-10 pr-10 text-[16px] sm:text-sm outline-none ring-0 transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
           />
           <AnimatePresence>
             {hasActiveSearch && (

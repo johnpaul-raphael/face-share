@@ -10,7 +10,9 @@ provider:
   timeout: 30
   environment:
     AWS_DYNAMODB_TABLE_NAME: FaceShareData
+    DYNAMODB_TABLE: FaceShareData
     REKOGNITION_COLLECTION_ID: faceshare-collection
+    REKOGNITION_COLLECTION: faceshare-collection
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME, 'faceshare-events'}
     SQS_QUEUE_URL: !Ref PhotoProcessingQueue
     SECRET_KEY: ${env:SECRET_KEY}

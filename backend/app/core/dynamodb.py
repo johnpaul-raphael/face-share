@@ -740,5 +740,42 @@ class DynamoDBService:
             return 0
 
 
+    def delete_all_photo_matches(self, photo_id: str) -> None:
+        """Delete all face match records for a photo."""
+        try:
+            matches = self.get_photo_matches(photo_id)
+            with self.table.batch_writer() as batch:
+                for m in matches:
+                    match_id = m.get('match_id', '')
+                    if match_id:
+                        batch.delete_item(Key={'PK': f'PHOTO#{photo_id}', 'SK': f'MATCH#{match_id}'})
+        except ClientError as e:
+            logger.error("[db] Error deleting photo matches: %s", e)
+
+    def delete_all_event_photos(self, event_id: str) -> None:
+        """Delete all photo records for an event."""
+        try:
+            photos = self.get_event_photos(event_id)
+            with self.table.batch_writer() as batch:
+                for p in photos:
+                    photo_id = p.get('photo_id', '')
+                    if photo_id:
+                        batch.delete_item(Key={'PK': f'EVENT#{event_id}', 'SK': f'PHOTO#{photo_id}'})
+        except ClientError as e:
+            logger.error("[db] Error deleting event photos: %s", e)
+
+    def delete_all_event_participants(self, event_id: str) -> None:
+        """Delete all participant records for an event."""
+        try:
+            participants = self.get_event_participants(event_id)
+            with self.table.batch_writer() as batch:
+                for p in participants:
+                    user_id = p.get('user_id', '')
+                    if user_id:
+                        batch.delete_item(Key={'PK': f'EVENT#{event_id}', 'SK': f'USER#{user_id}'})
+        except ClientError as e:
+            logger.error("[db] Error deleting event participants: %s", e)
+
+
 # Singleton instance
 dynamodb_service = DynamoDBService()
