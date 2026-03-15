@@ -54,6 +54,10 @@ provider:
             - sqs:DeleteMessage
             - sqs:GetQueueAttributes
           Resource: !GetAtt PhotoProcessingQueue.Arn
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+          Resource: "arn:aws:ssm:${self:provider.region}:*:parameter/faceshare/*"
 
 plugins:
   - serverless-python-requirements
