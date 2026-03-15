@@ -1,10 +1,23 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 
 
 class PresignedUploadRequest(BaseModel):
     filename: str
     content_type: str = "image/jpeg"
+
+    @field_validator("content_type", mode="before")
+    @classmethod
+    def normalise_content_type(cls, v: str) -> str:
+        """Treat empty / missing content_type as image/jpeg, and normalise
+        non-standard variants so the presigned URL and upload always agree."""
+        if not v:
+            return "image/jpeg"
+        v = v.lower().strip()
+        # 'image/jpg' is non-standard; AWS stores it as 'image/jpeg'
+        if v == "image/jpg":
+            return "image/jpeg"
+        return v
     event_id: Optional[str] = None       # For event photos
     user_id: Optional[str] = None        # For face profile images
     face_image_id: Optional[str] = None  # For face profile images

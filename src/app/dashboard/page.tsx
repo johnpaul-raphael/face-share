@@ -1,95 +1,440 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Users, Bell } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import { CreateEventDialog } from '@/components/create-event-dialog';
-import { Badge } from '@/components/ui/badge';
-import { apiClient, EventResponse } from '@/lib/api';
+import { Plus, Users, ArrowRight, CalendarDays, Crown, Sparkles, ImageIcon, Clock } from 'lucide-react';
+import { motion, AnimatePresence, useInView } from 'motion/react';
+import { apiClient, EventResponse, MyPhotosGroup } from '@/lib/api';
+import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { staggerContainer, staggerItem, fadeInUp, fadeInLeft, fadeInRight } from '@/lib/animations';
 
-export default function DashboardPage() {
-  const [events, setEvents] = useState<EventResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+/* ── helpers ──────────────────────────────────────────────────────────── */
+function greeting(): [string, string] {
+  const h = new Date().getHours();
+  if (h < 12) return ['Good morning', '☀️'];
+  if (h < 17) return ['Good afternoon', '🌤️'];
+  return ['Good evening', '🌙'];
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
+}
+
+function relativeTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  const diff  = Date.now() - new Date(dateStr).getTime();
+  const mins  = Math.floor(diff / 60_000);
+  const hours = Math.floor(mins / 60);
+  const days  = Math.floor(hours / 24);
+  if (mins  <  1) return 'Just now';
+  if (mins  < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days  <  7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+const GRADIENT_PALETTES = [
+  'from-violet-400 to-purple-600',
+  'from-sky-400 to-blue-600',
+  'from-emerald-400 to-teal-600',
+  'from-orange-400 to-rose-500',
+  'from-pink-400 to-fuchsia-600',
+  'from-amber-400 to-orange-500',
+];
+
+function eventGradient(name: string) {
+  return GRADIENT_PALETTES[name.charCodeAt(0) % GRADIENT_PALETTES.length];
+}
+
+/* ── AnimatedCount — count-up when scrolled into view ────────────────── */
+function AnimatedCount({ value }: { value: number }) {
+  const ref      = useRef<HTMLSpanElement>(null);
+  const [display, setDisplay] = useState(0);
+  const isInView = useInView(ref, { once: true });
 
   useEffect(() => {
-    apiClient.listEvents()
-      .then(setEvents)
-      .catch(() => toast({ variant: 'destructive', title: 'Failed to load events' }))
+    if (!isInView) return;           // stay at 0 until scrolled into view
+    if (value === 0) { setDisplay(0); return; }
+    const startTime = performance.now();
+    const duration  = 850;
+    const tick = (now: number) => {
+      const elapsed  = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased    = 1 - Math.pow(1 - progress, 3); // cubic ease-out
+      setDisplay(Math.round(eased * value));
+      if (progress < 1) rafId = requestAnimationFrame(tick);
+    };
+    let rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [isInView, value]);
+
+  return <span ref={ref}>{display}</span>;
+}
+
+/* ── EventCard ────────────────────────────────────────────────────────── */
+function EventCard({
+  event, isOwner, myPhotoCount,
+}: {
+  event: EventResponse; isOwner: boolean; myPhotoCount: number;
+}) {
+  return (
+    <Link href={`/dashboard/events/${event.id}`}>
+      <motion.div
+        variants={staggerItem}
+        whileHover={{ y: -6, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
+        className="group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-sm hover:shadow-lg transition-shadow"
+        style={{ borderColor: '#e8e2d9' }}
+      >
+        {/* Cover image */}
+        <div className="relative h-40 overflow-hidden">
+          {event.cover_image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={event.cover_image_url}
+              alt={event.name}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            />
+          ) : (
+            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${eventGradient(event.name)}`}>
+              <span className="text-5xl font-black text-white/30 select-none">
+                {event.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+
+          {/* Gradient fade */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
+          {/* Owner / Member badge */}
+          <div className="absolute top-3 left-3">
+            {isOwner ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow">
+                <Crown className="h-3 w-3" /> Owner
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                <Users className="h-3 w-3" /> Member
+              </span>
+            )}
+          </div>
+
+          {/* Bottom-right: participant count */}
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 text-xs text-white/90 font-medium">
+            <Users className="h-3.5 w-3.5" />
+            {event.participant_count}
+          </div>
+
+          {/* Bottom-left: "X photos of you" badge — appears when we have matches */}
+          {myPhotoCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+              className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-primary/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-white shadow"
+            >
+              <ImageIcon className="h-2.5 w-2.5" />
+              {myPhotoCount} of you
+            </motion.div>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-1 flex-col gap-1 p-3.5">
+          <h3 className="font-semibold leading-snug line-clamp-1 text-sm">{event.name}</h3>
+          {event.description && (
+            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+              {event.description}
+            </p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t px-3.5 py-2.5 gap-2" style={{ borderColor: '#f0ece5' }}>
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
+            <Clock className="h-3 w-3 shrink-0" />
+            {relativeTime(event.updated_at ?? event.created_at)}
+          </span>
+          <motion.div
+            whileHover={{ x: 3 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            className="shrink-0"
+          >
+            <ArrowRight className="h-4 w-4 text-primary" />
+          </motion.div>
+        </div>
+      </motion.div>
+    </Link>
+  );
+}
+
+/* ── CreateCard ───────────────────────────────────────────────────────── */
+function CreateCard() {
+  return (
+    <Link href="/dashboard/events/create">
+      <motion.div
+        variants={staggerItem}
+        whileHover={{ y: -6, scale: 1.01, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
+        whileTap={{ scale: 0.98 }}
+        className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-colors hover:border-primary/50 hover:bg-primary/5"
+        style={{ borderColor: '#e8e2d9' }}
+      >
+        <motion.div
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"
+          whileHover={{ rotate: 90, scale: 1.1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+        >
+          <Plus className="h-6 w-6 text-primary" />
+        </motion.div>
+        <div className="text-center">
+          <p className="text-sm font-semibold">New Event</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Create & share photos</p>
+        </div>
+      </motion.div>
+    </Link>
+  );
+}
+
+/* ── main page ────────────────────────────────────────────────────────── */
+const TABS = ['All', 'My Events', 'Joined'] as const;
+type Tab = (typeof TABS)[number];
+
+export default function DashboardPage() {
+  const [events, setEvents]       = useState<EventResponse[]>([]);
+  const [user, setUser]           = useState<User | null>(null);
+  const [myPhotos, setMyPhotos]   = useState<MyPhotosGroup[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>('All');
+  const { toast }                 = useToast();
+
+  const [greetText, greetEmoji] = greeting();
+
+  useEffect(() => {
+    Promise.all([
+      apiClient.listEvents(),
+      apiClient.getCurrentUser(),
+      apiClient.getMyPhotos().catch(() => [] as MyPhotosGroup[]),
+    ])
+      .then(([evts, u, photos]) => { setEvents(evts); setUser(u); setMyPhotos(photos); })
+      .catch(() => toast({ variant: 'destructive', title: 'Dashboard couldn\'t load', description: 'Refresh the page to try again.' }))
       .finally(() => setIsLoading(false));
   }, [toast]);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Your Events</h1>
-          <p className="text-muted-foreground">Events you own or have joined.</p>
+  const myPhotoCountByEvent = Object.fromEntries(
+    myPhotos.map((g) => [g.event_id, g.photos.length])
+  );
+
+  const owned  = events.filter((e) => e.owner_id === user?.id);
+  const joined = events.filter((e) => e.owner_id !== user?.id);
+  const visible = activeTab === 'My Events' ? owned : activeTab === 'Joined' ? joined : events;
+
+  /* ── loading skeleton ─────────────────────────────────────────────── */
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div className="space-y-2">
+          <div className="h-8 w-56 animate-pulse rounded-lg bg-muted" />
+          <div className="h-4 w-40 animate-pulse rounded bg-muted" />
         </div>
-        <CreateEventDialog onCreated={(e) => setEvents((prev) => [e, ...prev])}>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Event
-          </Button>
-        </CreateEventDialog>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+          <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[0,1,2].map((i) => <div key={i} className="h-20 animate-pulse rounded-2xl bg-muted" />)}
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[0,1,2].map((i) => (
+            <div key={i} className="h-56 animate-pulse rounded-2xl bg-muted" style={{ animationDelay: `${i * 80}ms` }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-7">
+
+      {/* ── Greeting ──────────────────────────────────────────────────── */}
+      <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="space-y-1.5">
+        <div className="flex items-center gap-2.5">
+          <motion.span
+            className="text-3xl leading-none"
+            animate={{ rotate: [0, 12, -8, 12, 0] }}
+            transition={{ duration: 1.2, delay: 0.4, ease: 'easeInOut' }}
+          >
+            {greetEmoji}
+          </motion.span>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            {greetText}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+          </h1>
+        </div>
+        <p className="text-sm text-muted-foreground flex items-center gap-1.5 pl-1">
+          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+          {formatDate()}
+        </p>
+      </motion.div>
+
+      {/* ── Quick-action tiles ────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+        <motion.div variants={fadeInLeft} initial="hidden" animate="visible">
+          <Link href="/dashboard/events/create">
+            <motion.div
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="relative overflow-hidden rounded-2xl p-5 text-white shadow-md"
+              style={{ background: '#0f1a2e' }}
+            >
+              <div className="pointer-events-none absolute inset-0 opacity-10"
+                style={{ backgroundImage: 'radial-gradient(circle at 70% 20%, #c9963a 0%, transparent 60%)' }} />
+              <Plus className="mb-3 h-6 w-6" style={{ color: '#c9963a' }} />
+              <p className="font-semibold text-sm">Create Event</p>
+              <p className="text-[11px] mt-0.5 text-white/60">Set up your event</p>
+              <ArrowRight className="absolute bottom-4 right-4 h-4 w-4 text-white/30" />
+            </motion.div>
+          </Link>
+        </motion.div>
+
+        <motion.div variants={fadeInRight} initial="hidden" animate="visible">
+          <Link href="/dashboard/events/join">
+            <motion.div
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="relative overflow-hidden rounded-2xl border p-5 shadow-sm hover:shadow-md transition-shadow"
+              style={{ background: 'white', borderColor: '#e8e2d9' }}
+            >
+              <Users className="mb-3 h-6 w-6 text-primary" />
+              <p className="font-semibold text-sm">Join Event</p>
+              <p className="text-[11px] mt-0.5 text-muted-foreground">Enter a join code</p>
+              <ArrowRight className="absolute bottom-4 right-4 h-4 w-4 text-muted-foreground/40" />
+            </motion.div>
+          </Link>
+        </motion.div>
       </div>
 
-      {isLoading ? (
-        <p className="text-muted-foreground">Loading events…</p>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {events.map((event) => (
-            <Link key={event.id} href={`/dashboard/events/${event.id}`}>
-              <Card className="flex h-full transform flex-col transition-transform duration-300 hover:scale-105 hover:shadow-xl">
-                <CardHeader className="relative p-0">
-                  <div className="relative h-48 w-full bg-muted flex items-center justify-center rounded-t-lg">
-                    {event.cover_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={event.cover_image_url}
-                        alt={event.name}
-                        className="h-full w-full rounded-t-lg object-cover"
-                      />
-                    ) : (
-                      <span className="text-muted-foreground text-sm">No cover image</span>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 p-4">
-                  <CardTitle className="mb-2 text-lg">{event.name}</CardTitle>
-                  <CardDescription className="line-clamp-2">{event.description}</CardDescription>
-                </CardContent>
-                <CardFooter className="p-4 pt-0">
-                  <div className="flex w-full items-center justify-between text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      <span>{event.participant_count} participants</span>
-                    </div>
-                    {/* owner badge based on owner_id would need current user — omit for now */}
-                  </div>
-                </CardFooter>
-              </Card>
-            </Link>
-          ))}
+      {/* ── Stats strip — count-up on scroll ──────────────────────────── */}
+      <motion.div
+        className="grid grid-cols-3 gap-3"
+        variants={staggerContainer}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: '-40px' }}
+      >
+        {[
+          { label: 'Total Events', value: events.length, icon: CalendarDays },
+          { label: 'My Events',    value: owned.length,  icon: Crown        },
+          { label: 'Joined',       value: joined.length, icon: Users        },
+        ].map(({ label, value, icon: Icon }) => (
+          <motion.div
+            key={label}
+            variants={staggerItem}
+            whileHover={{ y: -2, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
+            className="rounded-2xl border bg-card p-3.5 text-center shadow-sm cursor-default"
+            style={{ borderColor: '#e8e2d9' }}
+          >
+            <motion.div
+              className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10"
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              transition={{ type: 'spring', stiffness: 400 }}
+            >
+              <Icon className="h-4 w-4 text-primary" />
+            </motion.div>
+            <p className="text-2xl font-bold tabular-nums">
+              <AnimatedCount value={value} />
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
+          </motion.div>
+        ))}
+      </motion.div>
 
-          <Card className="flex h-full min-h-[280px] items-center justify-center rounded-lg border-2 border-dashed">
+      {/* ── Events section ────────────────────────────────────────────── */}
+      <div className="space-y-4">
+
+        {/* Section header + tab switcher */}
+        <motion.div
+          className="flex flex-wrap items-center justify-between gap-3"
+          variants={fadeInUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-40px' }}
+        >
+          <h2 className="text-lg font-semibold">Your Events</h2>
+
+          <div className="flex rounded-xl bg-muted p-1 text-sm font-medium">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="relative rounded-lg px-3 py-1 transition-colors"
+              >
+                {activeTab === tab && (
+                  <motion.div
+                    layoutId="tab-pill"
+                    className="absolute inset-0 rounded-lg bg-card shadow-sm"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 ${activeTab === tab ? 'text-foreground' : 'text-muted-foreground'}`}>
+                  {tab}
+                </span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Cards grid — stagger on scroll */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-40px' }}
+            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+          >
+            {visible.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                isOwner={event.owner_id === user?.id}
+                myPhotoCount={myPhotoCountByEvent[event.id] ?? 0}
+              />
+            ))}
+            <CreateCard />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Empty state */}
+        {visible.length === 0 && (
+          <motion.div
+            className="flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed py-16"
+            style={{ borderColor: '#e8e2d9' }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <motion.div
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <Sparkles className="h-8 w-8 text-primary" />
+            </motion.div>
             <div className="text-center">
-              <CreateEventDialog onCreated={(e) => setEvents((prev) => [e, ...prev])}>
-                <Button variant="ghost">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create a New Event
-                </Button>
-              </CreateEventDialog>
-              <p className="mt-2 text-sm text-muted-foreground">or join an existing one.</p>
+              <p className="font-semibold">No events here yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {activeTab === 'My Events' ? 'Create your first event to get started.' :
+                 activeTab === 'Joined'    ? 'Join an event using a code from your organiser.' :
+                                            'Create or join an event to get started.'}
+              </p>
             </div>
-          </Card>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }

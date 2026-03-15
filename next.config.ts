@@ -1,6 +1,20 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['192.168.1.178', '*.loca.lt', '*.serveousercontent.com'],
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

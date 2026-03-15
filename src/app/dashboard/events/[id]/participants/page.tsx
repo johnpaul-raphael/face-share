@@ -42,7 +42,7 @@ export default function ParticipantsPage() {
         setCurrentUserId(me.id);
         setParticipants(list);
       } catch {
-        toast({ variant: 'destructive', title: 'Failed to load participants' });
+        toast({ variant: 'destructive', title: 'Couldn\'t load attendees', description: 'Refresh the page to try again.' });
       } finally {
         setIsLoading(false);
       }
@@ -54,9 +54,9 @@ export default function ParticipantsPage() {
     try {
       await apiClient.removeParticipant(eventId, userId);
       setParticipants((prev) => prev.filter((p) => p.user_id !== userId));
-      toast({ title: 'Removed', description: `${userName} has been removed from the event.` });
+      toast({ title: `${userName} removed ✓`, description: 'They\'ve been taken off the guest list.' });
     } catch {
-      toast({ variant: 'destructive', title: 'Failed to remove participant' });
+      toast({ variant: 'destructive', title: 'Couldn\'t remove them', description: 'Try again in a moment.' });
     }
   };
 
@@ -68,11 +68,11 @@ export default function ParticipantsPage() {
         prev.map((p) => (p.user_id === userId ? { ...p, can_upload: updated.can_upload } : p))
       );
       toast({
-        title: updated.can_upload ? 'Upload granted' : 'Upload revoked',
-        description: `${updated.user_name} can ${updated.can_upload ? 'now' : 'no longer'} upload photos.`,
+        title: updated.can_upload ? 'Upload access on ✓' : 'Upload access off',
+        description: `${updated.user_name} ${updated.can_upload ? 'can now upload photos.' : 'can no longer upload photos.'}`,
       });
     } catch {
-      toast({ variant: 'destructive', title: 'Failed to update upload permission' });
+      toast({ variant: 'destructive', title: 'Permission not changed', description: 'Something went wrong — try again.' });
     } finally {
       setTogglingUpload(null);
     }

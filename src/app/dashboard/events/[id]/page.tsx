@@ -8,8 +8,9 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useParams, useRouter } from 'next/navigation';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { motion, AnimatePresence } from 'motion/react';
 import { apiClient, PhotoResponse } from '@/lib/api';
+import { staggerContainer, staggerItem, backdropVariants, slideUpOverlay } from '@/lib/animations';
 
 interface UploadingFile {
   file: File;
@@ -45,7 +46,6 @@ export default function EventGalleryPage() {
   const stagedPhotosRef = useRef(stagedPhotos);
   const { toast } = useToast();
 
-  // Keep ref in sync so the cleanup effect always has the latest list
   stagedPhotosRef.current = stagedPhotos;
 
   useEffect(() => {
@@ -66,17 +66,16 @@ export default function EventGalleryPage() {
           setCanUpload(myParticipant?.can_upload ?? false);
         }
       } catch {
-        // ignore — photos load independently
+        // ignore
       }
 
       apiClient.getEventPhotos(eventId)
         .then(setPublishedPhotos)
-        .catch(() => toast({ variant: 'destructive', title: 'Failed to load photos' }));
+        .catch(() => toast({ variant: 'destructive', title: 'Photos unavailable', description: 'Refresh the page to try again.' }));
     };
     load();
   }, [eventId, toast]);
 
-  // Cleanup local blob URLs on unmount
   useEffect(() => {
     return () => {
       stagedPhotosRef.current.forEach((p) => URL.revokeObjectURL(p.localUrl));
@@ -89,14 +88,12 @@ export default function EventGalleryPage() {
       setUploadingFiles((prev) => [...prev, { file, id: uploadingId, progress: 0 }]);
 
       try {
-        // Get presigned URL and create DynamoDB record
         const { upload_url, s3_key, photo_id } = await apiClient.getPresignedUpload({
           filename: file.name,
           content_type: file.type || 'image/jpeg',
           event_id: eventId,
         });
 
-        // Upload to S3 with real progress
         await apiClient.uploadToS3(upload_url, file, (pct) => {
           setUploadingFiles((prev) =>
             prev.map((f) => (f.id === uploadingId ? { ...f, progress: pct } : f))
@@ -108,12 +105,12 @@ export default function EventGalleryPage() {
           ...prev,
           { id: uploadingId, localUrl, file, uploadUrl: upload_url, s3Key: s3_key!, photoId: photo_id! },
         ]);
-        toast({ title: 'Ready for review', description: `${file.name} uploaded.` });
+        toast({ title: 'Photo ready ✓', description: `${file.name} is in the queue.` });
       } catch (err) {
         toast({
           variant: 'destructive',
           title: 'Upload failed',
-          description: `${file.name}: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          description: `${file.name} — ${err instanceof Error ? err.message : 'try again.'}`,
         });
       } finally {
         setUploadingFiles((prev) => prev.filter((f) => f.id !== uploadingId));
@@ -142,7 +139,6 @@ export default function EventGalleryPage() {
     if (stagedPhotos.length === 0) return;
     setIsPublishing(true);
 
-    // Only owners trigger face processing; participants just publish
     if (isOwner) {
       let processed = 0;
       for (const photo of stagedPhotos) {
@@ -154,19 +150,18 @@ export default function EventGalleryPage() {
         }
       }
       toast({
-        title: 'Photos Published!',
-        description: `${processed} of ${stagedPhotos.length} photos processed for face recognition.`,
+        title: `${processed} photo${processed !== 1 ? 's' : ''} live!`,
+        description: 'Face recognition is scanning for matches now.',
       });
     } else {
       toast({
-        title: 'Photos Submitted!',
-        description: `${stagedPhotos.length} photos submitted. The organizer will process them.`,
+        title: `${stagedPhotos.length} photo${stagedPhotos.length !== 1 ? 's' : ''} submitted ✓`,
+        description: 'The organiser will run face recognition shortly.',
       });
     }
 
     stagedPhotos.forEach((p) => URL.revokeObjectURL(p.localUrl));
     setStagedPhotos([]);
-    // Refresh photo list
     apiClient.getEventPhotos(eventId).then(setPublishedPhotos).catch(() => {});
     setIsPublishing(false);
   };
@@ -175,15 +170,14 @@ export default function EventGalleryPage() {
     try {
       await apiClient.deletePhoto(eventId, photoId);
       setPublishedPhotos((prev) => prev.filter((p) => p.photo_id !== photoId));
-      // If deleted photo was the cover, clear it
       const deleted = publishedPhotos.find((p) => p.photo_id === photoId);
       if (deleted && deleted.s3_key === coverS3Key) {
         setCoverS3Key('');
         setCoverImageUrl('');
       }
-      toast({ title: 'Photo deleted', description: 'The photo has been removed from the event.' });
+      toast({ title: 'Photo removed ✓', description: 'Gone from the event.' });
     } catch {
-      toast({ variant: 'destructive', title: 'Failed to delete photo' });
+      toast({ variant: 'destructive', title: 'Couldn\'t remove photo', description: 'Try again in a moment.' });
     }
   };
 
@@ -192,28 +186,59 @@ export default function EventGalleryPage() {
       await apiClient.updateEvent(eventId, { cover_image_url: photo.s3_key });
       setCoverS3Key(photo.s3_key);
       setCoverImageUrl(photo.url ?? '');
-      router.refresh(); // bust Next.js router cache so dashboard re-fetches
-      toast({ title: 'Cover photo updated', description: 'The event cover has been set.' });
+      router.refresh();
+      toast({ title: 'Cover updated ✓', description: 'New cover is live on the event.' });
     } catch {
-      toast({ variant: 'destructive', title: 'Failed to set cover photo' });
+      toast({ variant: 'destructive', title: 'Cover not updated', description: 'Try selecting the photo again.' });
     }
   };
 
   return (
     <div className="space-y-6">
-      <Dialog open={!!viewingUrl} onOpenChange={(o) => !o && setViewingUrl(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader><DialogTitle>Photo Preview</DialogTitle></DialogHeader>
-          {viewingUrl && (
-            <div className="relative mt-4 h-[70vh] w-full flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={viewingUrl} alt="Full size preview" className="max-h-full max-w-full object-contain" />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* ── Motion photo preview overlay ── */}
+      <AnimatePresence>
+        {viewingUrl && (
+          <>
+            <motion.div
+              key="backdrop"
+              variants={backdropVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="fixed inset-0 z-40 bg-black/80"
+              onClick={() => setViewingUrl(null)}
+            />
+            <motion.div
+              key="panel"
+              variants={slideUpOverlay}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl bg-background overflow-hidden md:inset-0 md:m-auto md:max-w-3xl md:max-h-[90vh] md:rounded-2xl"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <span className="text-sm font-medium text-muted-foreground">Photo Preview</span>
+                <button
+                  onClick={() => setViewingUrl(null)}
+                  className="rounded-full p-1.5 hover:bg-muted transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 flex items-center justify-center p-4 min-h-[50vh]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={viewingUrl}
+                  alt="Full size preview"
+                  className="max-h-[70vh] max-w-full object-contain rounded-lg"
+                />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
-      {/* Upload zone — shown only if user has permission */}
+      {/* Upload zone */}
       {canUpload ? (
         <Card className="border-2 border-dashed bg-secondary/50" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
           <CardContent className="p-6 text-center">
@@ -300,7 +325,7 @@ export default function EventGalleryPage() {
         </Card>
       )}
 
-      {/* Cover photo banner — owner only */}
+      {/* Cover photo banner */}
       {isOwner && coverImageUrl && (
         <div className="relative overflow-hidden rounded-lg border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -328,64 +353,71 @@ export default function EventGalleryPage() {
             Click the <Star className="inline h-3 w-3" /> on any photo to set it as the event cover.
           </p>
         )}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <motion.div
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {publishedPhotos.map((photo) => {
             const isCover = photo.s3_key === coverS3Key;
             return (
-            <Card key={photo.photo_id} className={cn('group overflow-hidden', isCover && 'ring-2 ring-yellow-400')}>
-              <CardContent className="relative h-64 w-full p-0">
-                {photo.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={photo.url}
-                    alt={`Photo ${photo.photo_id}`}
-                    className={cn('h-full w-full object-cover transition-transform duration-300 group-hover:scale-110', photo.is_processing && 'filter grayscale')}
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center bg-muted">
-                    <FileImage className="h-10 w-10 text-muted-foreground" />
-                  </div>
-                )}
-                {photo.is_processing && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                    <p className="mt-2 text-sm">Processing…</p>
-                  </div>
-                )}
-                {!photo.is_processing && (
-                  <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
-                    {isOwner && (
-                      <button
-                        onClick={() => handleSetCover(photo)}
-                        className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 hover:bg-black/70"
-                        title={isCover ? 'Current cover' : 'Set as cover'}
-                      >
-                        <Star className={cn('h-4 w-4', isCover ? 'fill-yellow-400 text-yellow-400' : 'text-white')} />
-                      </button>
+              <motion.div key={photo.photo_id} variants={staggerItem} whileHover={{ y: -2, transition: { duration: 0.15 } }}>
+                <Card className={cn('group overflow-hidden', isCover && 'ring-2 ring-yellow-400')}>
+                  <CardContent className="relative h-64 w-full p-0">
+                    {photo.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={photo.url}
+                        alt={`Photo ${photo.photo_id}`}
+                        className={cn('h-full w-full object-cover transition-transform duration-300 group-hover:scale-105', photo.is_processing && 'filter grayscale')}
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-muted">
+                        <FileImage className="h-10 w-10 text-muted-foreground" />
+                      </div>
                     )}
-                    <div className="absolute bottom-2 right-2 flex gap-2">
-                      <Button size="icon" variant="secondary" onClick={() => photo.url && setViewingUrl(photo.url)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {photo.url && (
-                        <a href={photo.url} download>
-                          <Button size="icon" variant="secondary"><Download className="h-4 w-4" /></Button>
-                        </a>
-                      )}
-                      {isOwner && (
-                        <Button
-                          size="icon"
-                          variant="destructive"
-                          onClick={() => handleDeletePhoto(photo.photo_id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                    {photo.is_processing && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="mt-2 text-sm">Processing…</p>
+                      </div>
+                    )}
+                    {!photo.is_processing && (
+                      <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
+                        {isOwner && (
+                          <button
+                            onClick={() => handleSetCover(photo)}
+                            className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 hover:bg-black/70"
+                            title={isCover ? 'Current cover' : 'Set as cover'}
+                          >
+                            <Star className={cn('h-4 w-4', isCover ? 'fill-yellow-400 text-yellow-400' : 'text-white')} />
+                          </button>
+                        )}
+                        <div className="absolute bottom-2 right-2 flex gap-2">
+                          <Button size="icon" variant="secondary" onClick={() => photo.url && setViewingUrl(photo.url)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {photo.url && (
+                            <a href={photo.url} download>
+                              <Button size="icon" variant="secondary"><Download className="h-4 w-4" /></Button>
+                            </a>
+                          )}
+                          {isOwner && (
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              onClick={() => handleDeletePhoto(photo.photo_id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
             );
           })}
           {publishedPhotos.length === 0 && stagedPhotos.length === 0 && uploadingFiles.length === 0 && (
@@ -399,7 +431,7 @@ export default function EventGalleryPage() {
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
     </div>
   );
