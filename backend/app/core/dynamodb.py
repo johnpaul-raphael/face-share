@@ -739,7 +739,6 @@ class DynamoDBService:
             logger.error("[db] Error counting photo matches: %s", e)
             return 0
 
-
     def delete_all_photo_matches(self, photo_id: str) -> None:
         """Delete all face match records for a photo."""
         try:
