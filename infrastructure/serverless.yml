@@ -112,19 +112,6 @@ functions:
           path: /faces/index
           method: post
 
-  # Trigger: Generate 400px thumbnail on S3 upload (event photos only)
-  generateThumbnail:
-    handler: lambda/generate_thumbnail.lambda_handler
-    memorySize: 512
-    timeout: 30
-    events:
-      - s3:
-          bucket: ${env:S3_BUCKET_NAME, 'faceshare-events'}
-          event: s3:ObjectCreated:*
-          rules:
-            - prefix: events/
-          existing: true
-
   # Trigger: Queue photo on S3 upload (any image type under events/)
   queuePhoto:
     handler: lambda/queue_photo.lambda_handler
