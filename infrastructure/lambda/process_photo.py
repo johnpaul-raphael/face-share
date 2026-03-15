@@ -69,30 +69,19 @@ def lambda_handler(event, context):
             
             # Step 3: Store results in DynamoDB
             table = dynamodb.Table(TABLE_NAME)
-            
-            # Update photo record
-            table.update_item(
-                Key={
-                    'PK': f'EVENT#{event_id}',
-                    'SK': f'PHOTO#{photo_id}'
-                },
-                UpdateExpression='SET is_processing = :done, faces_detected = :faces',
-                ExpressionAttributeValues={
-                    ':done': False,
-                    ':faces': faces_detected
-                }
-            )
-            
-            # Store each match
+
+            # Store each match first, count successes
+            match_count = 0
             for match in matches:
                 face = match['Face']
                 match_id = str(uuid.uuid4())
-                
+
                 table.put_item(Item={
                     'PK': f'PHOTO#{photo_id}',
                     'SK': f'MATCH#{match_id}',
                     'GSI1PK': f'USER#{face["ExternalImageId"]}',
                     'GSI1SK': f'MATCH#{match_id}',
+                    'match_id': match_id,
                     'user_id': face['ExternalImageId'],
                     'photo_id': photo_id,
                     'event_id': event_id,
@@ -100,8 +89,22 @@ def lambda_handler(event, context):
                     'rekognition_face_id': face['FaceId'],
                     'is_confirmed': False
                 })
-                
+                match_count += 1
                 print(f"   ✅ Match: {face['ExternalImageId']} ({match['Similarity']:.1f}%)")
+
+            # Update photo record — set match_count so the gallery filter works correctly
+            table.update_item(
+                Key={
+                    'PK': f'EVENT#{event_id}',
+                    'SK': f'PHOTO#{photo_id}'
+                },
+                UpdateExpression='SET is_processing = :done, faces_detected = :faces, match_count = :mc',
+                ExpressionAttributeValues={
+                    ':done': False,
+                    ':faces': faces_detected,
+                    ':mc': match_count,
+                }
+            )
             
             results.append({
                 'photo_id': photo_id,
