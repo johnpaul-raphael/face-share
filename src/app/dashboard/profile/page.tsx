@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import useSWR from 'swr';
 import {
   Camera, Trash2, ShieldCheck, AlertTriangle, Loader2,
   Save, ScanFace, Check, X, ChevronDown, Lightbulb,
-  User, Mail,
+  User, Mail, Zap, ImageIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
-import { apiClient } from '@/lib/api';
+import { apiClient, validateImageFile, compressImage } from '@/lib/api';
+import { useAppConfig } from '@/hooks/use-app-config';
 import type { User as UserType } from '@/lib/types';
 
 /* ── types ────────────────────────────────────────────────────────────── */
@@ -300,12 +302,12 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser]           = useState<UserType | null>(null);
   const [faceImage, setFaceImage]               = useState<FaceImage>({ saved: null, pending: null, deleteSaved: false });
   const [hasConsented, setHasConsented]         = useState(false);
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile]   = useState(false);
   const [isSavingFace, setIsSavingFace]         = useState(false);
   const [qualityStatus, setQualityStatus]       = useState<'idle' | 'checking' | 'done'>('idle');
   const [qualityChecks, setQualityChecks]       = useState<QualityCheck[]>([]);
   const [lightboxUrl, setLightboxUrl]           = useState<string | null>(null);
+  const { image_quality } = useAppConfig();
 
   const cameraInputRef   = useRef<HTMLInputElement | null>(null);
   const explorerInputRef = useRef<HTMLInputElement | null>(null);
@@ -313,27 +315,21 @@ export default function ProfilePage() {
   const { toast } = useToast();
 
   /* ── load ─────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [userData, profileData] = await Promise.all([
-          apiClient.getCurrentUser(),
-          apiClient.getFaceProfile(),
-        ]);
-        if (cancelled) return;
-        setCurrentUser(userData);
-        originalNameRef.current = userData.name ?? '';
-        const first = profileData.images[0];
-        if (first) setFaceImage({ saved: { imageId: first.id, url: first.url ?? '' }, pending: null, deleteSaved: false });
-      } catch {
-        if (!cancelled) toast({ variant: 'destructive', title: 'Couldn\'t load your profile', description: 'Check your connection and refresh.' });
-      } finally {
-        if (!cancelled) setIsProfileLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [toast]);
+  const { isLoading: userLoading } = useSWR('current-user', () => apiClient.getCurrentUser(), {
+    onSuccess: (data) => {
+      setCurrentUser(data);
+      originalNameRef.current = data.name ?? '';
+    },
+    onError: () => toast({ variant: 'destructive', title: 'Couldn\'t load your profile', description: 'Check your connection and refresh.' }),
+  });
+  const { isLoading: faceLoading } = useSWR('face-profile', () => apiClient.getFaceProfile(), {
+    onSuccess: (data) => {
+      const first = data.images[0];
+      if (first) setFaceImage({ saved: { imageId: first.id, url: first.url ?? '' }, pending: null, deleteSaved: false });
+    },
+  });
+
+  const isProfileLoading = userLoading || faceLoading;
 
   /* ── unified save ─────────────────────────────────────────────────── */
   const saveAll = async () => {
@@ -367,10 +363,13 @@ export default function ProfilePage() {
       if (faceImage.pending) {
         const { file, previewUrl: blobUrl } = faceImage.pending;
         try {
+          // Face profile photos are always compressed — 1024px at 92% quality
+          // is optimal for Rekognition face indexing accuracy vs storage cost
+          const toUpload = await compressImage(file, 1024, 0.92);
           const { upload_url, s3_key, face_image_id } = await apiClient.getPresignedUpload({
-            filename: file.name, content_type: file.type || 'image/jpeg',
+            filename: toUpload.name, content_type: toUpload.type || 'image/jpeg', file_size: toUpload.size,
           });
-          await apiClient.uploadToS3(upload_url, file, () => {});
+          await apiClient.uploadToS3(upload_url, toUpload, () => {});
           await apiClient.confirmFaceProfileUpload(face_image_id!, s3_key);
           URL.revokeObjectURL(blobUrl);
         } catch (err) {
@@ -396,11 +395,10 @@ export default function ProfilePage() {
   };
 
   /* ── file select ──────────────────────────────────────────────────── */
-  const SUPPORTED = ['image/jpeg', 'image/jpg', 'image/png'];
-
   const handleFileSelect = useCallback(async (file: File) => {
-    if (!SUPPORTED.includes(file.type.toLowerCase())) {
-      toast({ variant: 'destructive', title: 'Wrong file type', description: 'JPEG or PNG only — try a different photo.' });
+    const validationError = validateImageFile(file, 'face');
+    if (validationError) {
+      toast({ variant: 'destructive', title: 'Cannot use this file', description: validationError });
       return;
     }
     const blobUrl = URL.createObjectURL(file);
@@ -803,6 +801,57 @@ export default function ProfilePage() {
           {hasChanges && !hasConsented && (
             <p className="text-center text-[11px] text-amber-600">Tick the consent box above to save your face photo.</p>
           )}
+        </motion.div>
+
+        {/* ── Upload Quality (read-only, controlled via AWS SSM) ────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          className="rounded-2xl border overflow-hidden"
+        >
+          <div className="flex items-center justify-between px-5 py-4 bg-muted/30">
+            <div className="flex items-center gap-2.5">
+              {image_quality === 'optimized'
+                ? <Zap className="h-4 w-4 text-green-600" />
+                : <ImageIcon className="h-4 w-4 text-amber-500" />}
+              <div>
+                <p className="text-sm font-semibold">Upload Quality</p>
+                <p className="text-[11px] text-muted-foreground">Managed by administrator</p>
+              </div>
+            </div>
+            <motion.div
+              key={image_quality}
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                image_quality === 'optimized'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}
+            >
+              {image_quality === 'optimized' ? 'Cost Optimized' : 'Full Resolution'}
+            </motion.div>
+          </div>
+          <div className={`px-5 py-3 text-xs leading-relaxed border-t ${
+            image_quality === 'optimized'
+              ? 'bg-green-50/50 text-green-800'
+              : 'bg-amber-50/50 text-amber-800'
+          }`}>
+            {image_quality === 'optimized' ? (
+              <>
+                <span className="font-semibold">Images are automatically resized to 1920px and compressed before upload.</span>
+                {' '}Storage costs are minimised, face recognition runs faster, and uploads are quicker on mobile.
+                Gallery photos remain sharp on any phone or laptop screen.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">Images are uploaded at full resolution without compression.</span>
+                {' '}Every pixel from your camera is preserved — ideal for archiving or high-quality prints.
+                Files are larger and uploads may take longer on slower connections.
+              </>
+            )}
+          </div>
         </motion.div>
 
       </div>

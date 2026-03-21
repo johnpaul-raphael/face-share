@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Users, ArrowRight, CalendarDays, Crown, Sparkles, ImageIcon, Clock } from 'lucide-react';
+import { Plus, Users, ArrowRight, CalendarDays, Crown, Sparkles, ImageIcon, Clock, Search, X } from 'lucide-react';
 import { motion, AnimatePresence, useInView } from 'motion/react';
+import useSWR from 'swr';
 import { apiClient, EventResponse, MyPhotosGroup } from '@/lib/api';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -202,25 +203,23 @@ const TABS = ['All', 'My Events', 'Joined'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function DashboardPage() {
-  const [events, setEvents]       = useState<EventResponse[]>([]);
-  const [user, setUser]           = useState<User | null>(null);
-  const [myPhotos, setMyPhotos]   = useState<MyPhotosGroup[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('All');
-  const { toast }                 = useToast();
-
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
   const [greetText, greetEmoji] = greeting();
 
+  const { data: events = [], isLoading: eventsLoading, error: eventsError } =
+    useSWR('events', () => apiClient.listEvents());
+  const { data: user = null, isLoading: userLoading } =
+    useSWR<User | null>('current-user', () => apiClient.getCurrentUser());
+  const { data: myPhotos = [] } =
+    useSWR<MyPhotosGroup[]>('my-photos', () => apiClient.getMyPhotos().catch(() => []));
+
+  const isLoading = eventsLoading || userLoading;
+
   useEffect(() => {
-    Promise.all([
-      apiClient.listEvents(),
-      apiClient.getCurrentUser(),
-      apiClient.getMyPhotos().catch(() => [] as MyPhotosGroup[]),
-    ])
-      .then(([evts, u, photos]) => { setEvents(evts); setUser(u); setMyPhotos(photos); })
-      .catch(() => toast({ variant: 'destructive', title: 'Dashboard couldn\'t load', description: 'Refresh the page to try again.' }))
-      .finally(() => setIsLoading(false));
-  }, [toast]);
+    if (eventsError) toast({ variant: 'destructive', title: 'Dashboard couldn\'t load', description: 'Refresh the page to try again.' });
+  }, [eventsError, toast]);
 
   const myPhotoCountByEvent = Object.fromEntries(
     myPhotos.map((g) => [g.event_id, g.photos.length])
@@ -228,7 +227,11 @@ export default function DashboardPage() {
 
   const owned  = events.filter((e) => e.owner_id === user?.id);
   const joined = events.filter((e) => e.owner_id !== user?.id);
-  const visible = activeTab === 'My Events' ? owned : activeTab === 'Joined' ? joined : events;
+  const tabFiltered = activeTab === 'My Events' ? owned : activeTab === 'Joined' ? joined : events;
+  const visible = searchQuery
+    ? tabFiltered.filter((e) => e.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : tabFiltered;
+  const hasActiveSearch = searchQuery.length > 0;
 
   /* ── loading skeleton ─────────────────────────────────────────────── */
   if (isLoading) {
@@ -386,6 +389,53 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
+        {/* Search bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+          className="relative"
+        >
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search events…"
+            className="w-full rounded-xl border bg-background/60 backdrop-blur-sm py-2.5 pl-10 pr-10 text-[16px] sm:text-sm outline-none ring-0 transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
+          />
+          <AnimatePresence>
+            {hasActiveSearch && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Result count — only shown when searching */}
+        <AnimatePresence>
+          {hasActiveSearch && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="text-xs text-muted-foreground overflow-hidden"
+            >
+              {visible.length === 0
+                ? `No events match "${searchQuery}"`
+                : `${visible.length} event${visible.length !== 1 ? 's' : ''} found`}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
         {/* Cards grid — stagger on scroll */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -419,15 +469,20 @@ export default function DashboardPage() {
           >
             <motion.div
               className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10"
-              animate={{ y: [0, -6, 0] }}
+              animate={hasActiveSearch ? {} : { y: [0, -6, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             >
-              <Sparkles className="h-8 w-8 text-primary" />
+              {hasActiveSearch
+                ? <Search className="h-8 w-8 text-primary" />
+                : <Sparkles className="h-8 w-8 text-primary" />}
             </motion.div>
             <div className="text-center">
-              <p className="font-semibold">No events here yet</p>
+              <p className="font-semibold">
+                {hasActiveSearch ? `No results for "${searchQuery}"` : 'No events here yet'}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {activeTab === 'My Events' ? 'Create your first event to get started.' :
+                {hasActiveSearch ? 'Try a different search term.' :
+                 activeTab === 'My Events' ? 'Create your first event to get started.' :
                  activeTab === 'Joined'    ? 'Join an event using a code from your organiser.' :
                                             'Create or join an event to get started.'}
               </p>

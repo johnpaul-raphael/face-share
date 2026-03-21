@@ -10,7 +10,9 @@ provider:
   timeout: 30
   environment:
     AWS_DYNAMODB_TABLE_NAME: FaceShareData
+    DYNAMODB_TABLE: FaceShareData
     REKOGNITION_COLLECTION_ID: faceshare-collection
+    REKOGNITION_COLLECTION: faceshare-collection
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME, 'faceshare-events'}
     SQS_QUEUE_URL: !Ref PhotoProcessingQueue
     SECRET_KEY: ${env:SECRET_KEY}
@@ -54,6 +56,10 @@ provider:
             - sqs:DeleteMessage
             - sqs:GetQueueAttributes
           Resource: !GetAtt PhotoProcessingQueue.Arn
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+          Resource: "arn:aws:ssm:${self:provider.region}:*:parameter/faceshare/*"
 
 plugins:
   - serverless-python-requirements
@@ -63,7 +69,7 @@ custom:
   pythonRequirements:
     pythonBin: python
     dockerizePip: false
-    slim: true
+    slim: false
     fileName: ../backend/requirements.txt
 
 package:

@@ -263,6 +263,24 @@ def check_s3_object_exists(key: str) -> bool:
         return False
 
 
+def tag_s3_objects_for_deletion(keys: list[str]) -> None:
+    """
+    Tag S3 objects so the bucket lifecycle rule deletes them after 7 days.
+    Called in a background task — errors are logged but never raised.
+    """
+    for key in keys:
+        if not key:
+            continue
+        try:
+            s3_client.put_object_tagging(
+                Bucket=settings.S3_BUCKET_NAME,
+                Key=key,
+                Tagging={'TagSet': [{'Key': 'faceshare-delete', 'Value': 'scheduled'}]},
+            )
+        except Exception as e:
+            logger.warning("Failed to tag S3 object %s for deletion: %s", key, e)
+
+
 # ==========================================
 # S3 KEY GENERATORS
 # ==========================================
@@ -285,6 +303,19 @@ def get_s3_key_for_face_crop(photo_id: str, match_id: str) -> str:
 def get_s3_key_for_event_cover(event_id: str, filename: str) -> str:
     """Generate S3 key (path) for an event cover image."""
     return f"events/{event_id}/cover/{filename}"
+
+
+def get_s3_key_for_thumbnail(original_s3_key: str) -> str:
+    """
+    Derive the thumbnail S3 key from an original event photo key.
+
+    Originals: events/{event_id}/photos/{photo_id}/{filename}
+    Thumbnails: thumbs/events/{event_id}/photos/{photo_id}/{filename}
+
+    The 'thumbs/' prefix keeps thumbnails outside the 'events/' S3 trigger
+    prefix, preventing the thumbnail Lambda from triggering itself.
+    """
+    return f"thumbs/{original_s3_key}"
 
 
 # ==========================================

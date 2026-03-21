@@ -17,6 +17,7 @@ from app.services.dynamodb_auth_service import (
     get_user_by_id as dynamodb_get_user_by_id,
     create_user as dynamodb_create_user,
 )
+from app.core.dynamodb import dynamodb_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -72,12 +73,16 @@ async def google_login(request: GoogleLoginRequest):
 
     email = idinfo["email"]
     name = idinfo.get("name", email.split("@")[0])
+    avatar_url = idinfo.get("picture")
 
     user = dynamodb_get_user_by_email(email)
     if not user:
-        user = dynamodb_create_user(email=email, name=name, password=str(uuid4()))
+        user = dynamodb_create_user(email=email, name=name, password=str(uuid4()),
+                                    avatar_url=avatar_url)
         if not user:
             raise HTTPException(status_code=500, detail="Failed to create user")
+    elif avatar_url and user.avatar_url != avatar_url:
+        dynamodb_service.update_user(user.id, avatar_url=avatar_url)
 
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})

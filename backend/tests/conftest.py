@@ -68,6 +68,7 @@ FAKE_PHOTO = {
     "s3_key": "events/event-xyz-456/photos/photo-111.jpg",
     "is_processing": False,
     "uploaded_at": "2024-01-01T00:00:00",
+    "match_count": 2,
 }
 
 FAKE_FACE_PROFILE = {

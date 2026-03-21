@@ -14,7 +14,8 @@ import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { apiClient, EventResponse } from '@/lib/api';
+import { apiClient, EventResponse, validateImageFile, compressImage } from '@/lib/api';
+import { useAppConfig } from '@/hooks/use-app-config';
 import { fadeInUp, fadeInScale, pageTransition } from '@/lib/animations';
 
 const formSchema = z.object({
@@ -162,6 +163,7 @@ function CoverUploadZone({
 export default function CreateEventPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { image_quality } = useAppConfig();
   const [createdEvent, setCreatedEvent] = useState<EventResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -180,6 +182,12 @@ export default function CreateEventPage() {
 
   /* ── Cover upload ──────────────────────────────────────────────────── */
   const handleCoverFile = async (file: File) => {
+    const validationError = validateImageFile(file, 'cover');
+    if (validationError) {
+      toast({ variant: 'destructive', title: 'Cannot use this file', description: validationError });
+      return;
+    }
+
     // Revoke previous blob
     if (coverBlobRef.current) URL.revokeObjectURL(coverBlobRef.current);
     const blobUrl = URL.createObjectURL(file);
@@ -190,11 +198,15 @@ export default function CreateEventPage() {
     setCoverUrl(null);
 
     try {
+      // Cover photos are always compressed — 1440px at 88% quality
+      // gives excellent visual quality (~500 KB) regardless of quality setting
+      const toUpload = await compressImage(file, 1440, 0.88);
       const { upload_url, s3_key } = await apiClient.getPresignedUpload({
-        filename: file.name,
-        content_type: file.type || 'image/jpeg',
+        filename: toUpload.name,
+        content_type: toUpload.type || 'image/jpeg',
+        file_size: toUpload.size,
       });
-      await apiClient.uploadToS3(upload_url, file, (pct) => setCoverProgress(pct));
+      await apiClient.uploadToS3(upload_url, toUpload, (pct) => setCoverProgress(pct));
       const { download_url } = await apiClient.getPresignedDownload(s3_key);
       setCoverUrl(download_url);
       setCoverState('done');

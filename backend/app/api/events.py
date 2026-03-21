@@ -1,13 +1,13 @@
 import secrets
 import string
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from uuid import uuid4
 from datetime import datetime, timezone
 
 from app.api.deps import get_current_user
 from app.core.dynamodb import dynamodb_service
-from app.core.s3 import generate_presigned_download_url
+from app.core.s3 import generate_presigned_download_url, tag_s3_objects_for_deletion
 from app.schemas.event import (
     EventCreate, EventUpdate, EventResponse, EventDetailResponse,
     EventJoinRequest, EventJoinResponse, EventParticipantResponse,
@@ -164,15 +164,33 @@ async def update_event(
 
 
 @router.delete("/{event_id}", status_code=204)
-async def delete_event(event_id: str, current_user=Depends(get_current_user)):
+async def delete_event(event_id: str, background_tasks: BackgroundTasks, current_user=Depends(get_current_user)):
     event = dynamodb_service.get_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     if event['owner_id'] != current_user.id:
         raise HTTPException(status_code=403, detail="Only the event owner can delete this event")
 
+    # Collect all S3 keys before deleting DB records
+    photos = dynamodb_service.get_event_photos(event_id)
+    s3_keys = [
+        key
+        for photo in photos
+        for key in (photo.get('s3_key'), photo.get('thumbnail_s3_key'))
+        if key
+    ]
+
+    # Hard delete: matches → photos → participants → join code → event
+    for photo in photos:
+        dynamodb_service.delete_all_photo_matches(photo.get('photo_id', ''))
+    dynamodb_service.delete_all_event_photos(event_id)
+    dynamodb_service.delete_all_event_participants(event_id)
     dynamodb_service.delete_join_code_lookup(event['join_code'])
     dynamodb_service.delete_event(event_id)
+
+    # Tag S3 objects for deletion after 7 days (background — non-blocking)
+    if s3_keys:
+        background_tasks.add_task(tag_s3_objects_for_deletion, s3_keys)
 
 
 @router.post("/join", response_model=EventJoinResponse)

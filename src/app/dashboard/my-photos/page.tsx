@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import useSWR from 'swr';
 import {
   Download, Image as ImageIcon, X, ChevronLeft, ChevronRight,
-  Sparkles, Loader2, ZoomIn, Shield,
+  Sparkles, Loader2, ZoomIn, ShieldCheck, ShieldAlert, ShieldQuestion,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiClient } from '@/lib/api';
@@ -22,6 +23,12 @@ function formatDate(iso: string) {
 
 function safeName(eventName: string, photoId: string) {
   return `${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_${photoId}.jpg`;
+}
+
+function confidenceLevel(score: number): { label: string; color: string; bg: string; Icon: React.ElementType } {
+  if (score >= 90) return { label: `${Math.round(score)}% match`, color: '#16a34a', bg: 'rgba(22,163,74,0.18)', Icon: ShieldCheck };
+  if (score >= 75) return { label: `${Math.round(score)}% match`, color: '#d97706', bg: 'rgba(217,119,6,0.18)', Icon: ShieldQuestion };
+  return { label: `${Math.round(score)}% match`, color: '#dc2626', bg: 'rgba(220,38,38,0.18)', Icon: ShieldAlert };
 }
 
 /* ── useDownload ──────────────────────────────────────────────────────── */
@@ -113,16 +120,30 @@ function PhotoCard({
             </span>
           </div>
 
-          {/* Actions — bottom on hover */}
-          <div className="absolute bottom-3 inset-x-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            {/* Confidence */}
-            {photo.confidence > 0 && (
-              <span className="flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-sm px-2 py-1 text-[9px] font-bold text-white">
-                <Shield className="h-2.5 w-2.5" style={{ color: '#c9963a' }} />
-                {Math.round(photo.confidence)}%
-              </span>
-            )}
-            <div className="flex gap-1.5 ml-auto">
+          {/* Confidence badge — always visible, bottom-left */}
+          {photo.confidence > 0 && (() => {
+            const { label, color, bg, Icon } = confidenceLevel(photo.confidence);
+            return (
+              <motion.div
+                className="absolute bottom-2 left-2 z-10"
+                initial={{ opacity: 0, scale: 0.7, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25, delay: 0.15 }}
+              >
+                <span
+                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold shadow-md backdrop-blur-sm"
+                  style={{ color, background: bg }}
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  {label}
+                </span>
+              </motion.div>
+            );
+          })()}
+
+          {/* Actions — bottom-right on hover */}
+          <div className="absolute bottom-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="flex gap-1.5">
               <motion.button
                 type="button" whileTap={{ scale: 0.88 }}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
@@ -242,10 +263,19 @@ function Lightbox({
               <div className="flex items-center gap-3">
                 <div className="text-center">
                   <p className="text-white font-semibold text-sm">{group.event_name}</p>
-                  <p className="text-white/40 text-[11px] mt-0.5">
-                    {(state.photoIndex) + 1} of {total} · {formatDate(photo.uploaded_at)}
-                    {photo.confidence > 0 && ` · ${Math.round(photo.confidence)}% match`}
-                  </p>
+                  <div className="flex items-center justify-center gap-2 mt-0.5">
+                    <p className="text-white/40 text-[11px]">
+                      {(state.photoIndex) + 1} of {total} · {formatDate(photo.uploaded_at)}
+                    </p>
+                    {photo.confidence > 0 && (() => {
+                      const { label, color, bg, Icon } = confidenceLevel(photo.confidence);
+                      return (
+                        <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ color, background: bg }}>
+                          <Icon className="h-2.5 w-2.5" />{label}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
               <motion.button
@@ -270,8 +300,6 @@ function Lightbox({
 
 /* ── main page ────────────────────────────────────────────────────────── */
 export default function MyPhotosPage() {
-  const [groups, setGroups]         = useState<MyPhotosGroup[]>([]);
-  const [isLoading, setIsLoading]   = useState(true);
   const [activeEvent, setActiveEvent] = useState<string>('all');
   const [lightbox, setLightbox]     = useState<LightboxState>(null);
   const { toast }      = useToast();
@@ -279,12 +307,14 @@ export default function MyPhotosPage() {
   const { downloadImage, downloading } = useDownload();
 
   /* ── load ─────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    apiClient.getMyPhotos()
-      .then(data => { setGroups(data); clearBadge(); })
-      .catch(() => toast({ variant: 'destructive', title: 'Photos unavailable', description: 'Refresh the page to try again.' }))
-      .finally(() => setIsLoading(false));
-  }, [toast, clearBadge]);
+  const { data: groups = [], isLoading } = useSWR<MyPhotosGroup[]>(
+    'my-photos',
+    () => apiClient.getMyPhotos(),
+    {
+      onSuccess: () => clearBadge(),
+      onError: () => toast({ variant: 'destructive', title: 'Photos unavailable', description: 'Refresh the page to try again.' }),
+    },
+  );
 
   /* ── keyboard navigation ──────────────────────────────────────────── */
   useEffect(() => {

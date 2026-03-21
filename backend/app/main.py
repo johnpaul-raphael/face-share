@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.api import auth, users, events, participants, images
+from app.api import auth, users, events, participants, images, config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ app.include_router(participants.router, prefix=f"{settings.API_V1_STR}", tags=["
 app.include_router(images.router, prefix=f"{settings.API_V1_STR}/images", tags=["images"])
 # Event photos and match management routes live under /api/v1 directly
 app.include_router(images.router, prefix=f"{settings.API_V1_STR}", tags=["photos"])
+app.include_router(config.router, prefix=f"{settings.API_V1_STR}", tags=["config"])
 
 
 @app.get("/")
