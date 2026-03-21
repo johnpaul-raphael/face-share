@@ -33,6 +33,7 @@ Example Usage:
 """
 
 import logging
+import os
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -52,25 +53,55 @@ def create_s3_client():
     """
     Create and configure the S3 client.
 
-    Uses credentials from environment (.env file).
-    Configures region and signature version for security.
+    In Lambda/STS environments (AWS_SESSION_TOKEN is present), uses boto3's
+    default credential chain so the session token is included automatically
+    in presigned URL signatures (required for STS creds to work with S3).
+
+    In local development, uses explicit credentials from .env.
 
     Returns:
         boto3.client: Configured S3 client
     """
-    boto_config = Config(
-        region_name=settings.AWS_REGION,
-        signature_version='v4',  # AWS Signature Version 4 (most secure)
+    _cfg = Config(signature_version='v4')
+
+    # Lambda injects AWS_SESSION_TOKEN along with temporary STS credentials.
+    # We must NOT pass explicit key/secret in that case — boto3's default chain
+    # picks up all three (key, secret, session_token) and includes
+    # X-Amz-Security-Token in presigned URLs, which S3 requires for STS creds.
+    if os.environ.get('AWS_SESSION_TOKEN'):
+        logger.info(
+            "[S3] Lambda/STS environment detected — using default credential chain. "
+            "region=%s bucket=%s",
+            settings.AWS_REGION,
+            settings.S3_BUCKET_NAME,
+        )
+        return boto3.client(
+            's3',
+            region_name=settings.AWS_REGION,
+            config=_cfg,
+        )
+
+    # Local development: explicit IAM user credentials from .env
+    if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
+        raise RuntimeError(
+            "AWS credentials not loaded — check that backend/.env contains "
+            "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
+        )
+
+    logger.info(
+        "[S3] Local dev — explicit credentials: key=%s... region=%s bucket=%s",
+        settings.AWS_ACCESS_KEY_ID[:8],
+        settings.AWS_REGION,
+        settings.S3_BUCKET_NAME,
     )
 
-    client = boto3.client(
+    return boto3.client(
         's3',
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        config=boto_config,
+        region_name=settings.AWS_REGION,
+        config=_cfg,
     )
-
-    return client
 
 
 # Initialize S3 client at module load
@@ -113,7 +144,12 @@ def generate_presigned_upload_url(
             Params={
                 'Bucket': settings.S3_BUCKET_NAME,
                 'Key': key,
-                'ContentType': content_type,
+                # ContentType intentionally excluded from signature params.
+                # Including it locks the upload to an exact MIME type and causes
+                # 403s whenever file.type is empty, non-standard, or mismatches
+                # (e.g. "image/jpg" vs "image/jpeg" on different browsers/devices).
+                # The frontend still sends Content-Type in the XHR headers so the
+                # S3 object gets correct metadata — it just isn't signature-verified.
             },
             ExpiresIn=expiration
         )
@@ -227,6 +263,24 @@ def check_s3_object_exists(key: str) -> bool:
         return False
 
 
+def tag_s3_objects_for_deletion(keys: list[str]) -> None:
+    """
+    Tag S3 objects so the bucket lifecycle rule deletes them after 7 days.
+    Called in a background task — errors are logged but never raised.
+    """
+    for key in keys:
+        if not key:
+            continue
+        try:
+            s3_client.put_object_tagging(
+                Bucket=settings.S3_BUCKET_NAME,
+                Key=key,
+                Tagging={'TagSet': [{'Key': 'faceshare-delete', 'Value': 'scheduled'}]},
+            )
+        except Exception as e:
+            logger.warning("Failed to tag S3 object %s for deletion: %s", key, e)
+
+
 # ==========================================
 # S3 KEY GENERATORS
 # ==========================================
@@ -249,6 +303,19 @@ def get_s3_key_for_face_crop(photo_id: str, match_id: str) -> str:
 def get_s3_key_for_event_cover(event_id: str, filename: str) -> str:
     """Generate S3 key (path) for an event cover image."""
     return f"events/{event_id}/cover/{filename}"
+
+
+def get_s3_key_for_thumbnail(original_s3_key: str) -> str:
+    """
+    Derive the thumbnail S3 key from an original event photo key.
+
+    Originals: events/{event_id}/photos/{photo_id}/{filename}
+    Thumbnails: thumbs/events/{event_id}/photos/{photo_id}/{filename}
+
+    The 'thumbs/' prefix keeps thumbnails outside the 'events/' S3 trigger
+    prefix, preventing the thumbnail Lambda from triggering itself.
+    """
+    return f"thumbs/{original_s3_key}"
 
 
 # ==========================================

@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.schemas.image import (
     PresignedUploadRequest, PresignedUploadResponse,
     PresignedDownloadRequest, PresignedDownloadResponse,
-    PhotoResponse,
+    PhotoResponse, FaceMatchResponse,
+    MAX_EVENT_PHOTO_BYTES, MAX_FACE_PROFILE_BYTES,
 )
 from app.api.deps import get_current_user
 from app.core.s3 import (
@@ -32,6 +33,15 @@ async def get_presigned_upload_url(
     request: PresignedUploadRequest,
     current_user=Depends(get_current_user),
 ):
+    # ── File size guard (client-reported; enforced before any DB/S3 work) ──────
+    if request.file_size is not None:
+        limit = MAX_EVENT_PHOTO_BYTES if request.event_id else MAX_FACE_PROFILE_BYTES
+        if request.file_size > limit:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum allowed size is {limit // (1024 * 1024)} MB.",
+            )
+
     if request.event_id:
         # Event photo upload - check permission
         event = dynamodb_service.get_event(request.event_id)
@@ -205,7 +215,7 @@ async def get_event_photos(event_id: str, current_user=Depends(get_current_user)
     if not participant and not is_owner:
         raise HTTPException(status_code=403, detail="Not a participant of this event")
 
-    photos_raw = dynamodb_service.get_event_photos(event_id)
+    photos_raw = dynamodb_service.get_event_photos_sorted(event_id)
     result = []
     for photo in photos_raw:
         photo_id = photo.get('photo_id', '')
@@ -219,16 +229,56 @@ async def get_event_photos(event_id: str, current_user=Depends(get_current_user)
                 continue
 
         url = generate_presigned_download_url(s3_key) if s3_key else None
-        match_count = dynamodb_service.get_photo_match_count(photo_id)
+        # Only generate thumbnail URL once the Lambda has confirmed the thumbnail
+        # exists by writing thumbnail_s3_key to DynamoDB. Never guess the key.
+        thumbnail_s3_key = photo.get('thumbnail_s3_key')
+        thumbnail_url = generate_presigned_download_url(thumbnail_s3_key) if thumbnail_s3_key else None
+        match_count = int(photo.get('match_count', 0))
         result.append(PhotoResponse(
             photo_id=photo_id,
             event_id=event_id,
             uploader_id=photo.get('uploader_id', ''),
             s3_key=s3_key,
             url=url,
+            thumbnail_url=thumbnail_url,
             is_processing=photo.get('is_processing', False),
             uploaded_at=photo.get('uploaded_at'),
             match_count=match_count,
+        ))
+    return result
+
+
+@router.get("/events/{event_id}/photos/{photo_id}/matches", response_model=list[FaceMatchResponse])
+async def get_photo_matches(
+    event_id: str,
+    photo_id: str,
+    current_user=Depends(get_current_user),
+):
+    """List all face matches for a photo. Owner only."""
+    event = dynamodb_service.get_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event['owner_id'] != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the event owner can view match details")
+
+    photo = dynamodb_service.get_photo(event_id, photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    matches_raw = dynamodb_service.get_photo_matches(photo_id)
+    result = []
+    for m in matches_raw:
+        user_id = m.get('user_id', '')
+        user = dynamodb_service.get_user_by_id(user_id) if user_id else None
+        result.append(FaceMatchResponse(
+            match_id=m.get('match_id', ''),
+            photo_id=photo_id,
+            user_id=user_id,
+            user_name=user.get('name') if user else None,
+            user_email=user.get('email') if user else None,
+            confidence=float(m.get('confidence', 0)),
+            is_confirmed=m.get('is_confirmed', False),
+            created_at=m.get('created_at'),
         ))
     return result
 
@@ -298,6 +348,7 @@ async def process_event_photo(
                 confidence=similarity,
                 created_at=now,
             )
+            dynamodb_service.increment_photo_match_count(event_id, photo_id)
             logger.info("[process-photo] Matched participant %s (similarity=%.1f%%)", user_id, similarity)
 
     unmatched_in_collection = [uid for uid in raw_matched_user_ids if uid not in participant_ids]
@@ -358,6 +409,7 @@ async def delete_match(
         raise HTTPException(status_code=404, detail="Match not found")
 
     dynamodb_service.delete_match(photo_id, match_id)
+    dynamodb_service.increment_photo_match_count(event_id, photo_id, delta=-1)
 
 
 @router.delete("/events/{event_id}/photos/{photo_id}", status_code=204)

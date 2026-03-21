@@ -1,27 +1,16 @@
-import Link from 'next/link';
-import {
-  Home,
-  Image as ImageIcon,
-  User,
-  PanelLeft,
-  Settings,
-  PlusCircle,
-} from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarFooter,
-  SidebarTrigger,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
 import { UserNav } from '@/components/user-nav';
 import AppLogo from '@/components/app-logo';
+import { DashboardNav } from '@/components/dashboard-nav';
+import { MobileNav } from '@/components/mobile-nav';
+import PageTransition from '@/components/page-transition';
+import { MotionHeaderButton } from '@/components/motion-header-button';
+import { AccentPicker } from '@/components/accent-picker';
 
 export default function DashboardLayout({
   children,
@@ -30,69 +19,49 @@ export default function DashboardLayout({
 }) {
   return (
     <SidebarProvider>
-      <Sidebar>
+      {/* ── Desktop sidebar (hidden on mobile) ── */}
+      <Sidebar className="hidden md:flex">
         <SidebarHeader>
-          <div className="flex h-12 items-center justify-between px-2">
+          <div className="flex h-12 items-center px-3">
             <AppLogo />
           </div>
         </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Dashboard">
-                <Link href="/dashboard">
-                  <Home />
-                  Dashboard
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="My Photos">
-                <Link href="/dashboard/my-photos">
-                  <ImageIcon />
-                  My Photos
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Profile">
-                <Link href="/dashboard/profile">
-                  <User />
-                  Profile
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Settings">
-                <Settings />
-                Settings
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
+        <DashboardNav />
       </Sidebar>
+
       <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
-          <SidebarTrigger className="flex md:hidden" />
-          <div className="flex-1">
-            {/* Page title could go here */}
+        {/* ── Header ── */}
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-card px-4 sm:px-6"
+          style={{ borderColor: '#e8e2d9' }}>
+          {/* Mobile: logo on left */}
+          <div className="md:hidden">
+            <AppLogo />
           </div>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/events/join">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Join Event
-              </Link>
-            </Button>
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Join event button — desktop only (mobile uses FAB) */}
+            <div className="hidden md:block">
+              <MotionHeaderButton href="/dashboard/events/join" />
+            </div>
             <UserNav />
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+
+        {/* ── Page content — extra bottom padding on mobile for bottom nav ── */}
+        <main className="flex-1 overflow-auto p-4 pb-24 sm:p-6 sm:pb-24 md:pb-6">
+          <PageTransition>{children}</PageTransition>
+        </main>
+
+        {/* ── AccentPicker — hidden on mobile (sits above bottom nav awkwardly) ── */}
+        <div className="hidden md:block">
+          <AccentPicker />
+        </div>
       </SidebarInset>
+
+      {/* ── Mobile bottom navigation ── */}
+      <MobileNav />
     </SidebarProvider>
   );
 }

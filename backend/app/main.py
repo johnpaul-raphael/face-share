@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.api import auth, users, events, participants, images
+from app.api import auth, users, events, participants, images, config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,12 +16,8 @@ app = FastAPI(
 
 def _cors_headers_for_request(request: Request) -> dict:
     """Build CORS headers so error responses (e.g. 500) are not blocked by the browser."""
-    origin = request.headers.get("origin")
-    if origin and origin in settings.CORS_ORIGINS:
-        return {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}
-    if settings.CORS_ORIGINS:
-        return {"Access-Control-Allow-Origin": settings.CORS_ORIGINS[0], "Access-Control-Allow-Credentials": "true"}
-    return {}
+    origin = request.headers.get("origin", "*")
+    return {"Access-Control-Allow-Origin": origin}
 
 
 @app.exception_handler(Exception)
@@ -35,16 +31,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Log CORS origins for debugging
-logger.info(f"CORS Origins: {settings.CORS_ORIGINS}")
-
-# CORS middleware - must be added before routers
+# CORS middleware — allow all origins everywhere (local + Lambda).
+# Uses Bearer tokens (not cookies) so allow_credentials=False is correct.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers
@@ -55,6 +49,7 @@ app.include_router(participants.router, prefix=f"{settings.API_V1_STR}", tags=["
 app.include_router(images.router, prefix=f"{settings.API_V1_STR}/images", tags=["images"])
 # Event photos and match management routes live under /api/v1 directly
 app.include_router(images.router, prefix=f"{settings.API_V1_STR}", tags=["photos"])
+app.include_router(config.router, prefix=f"{settings.API_V1_STR}", tags=["config"])
 
 
 @app.get("/")

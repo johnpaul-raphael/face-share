@@ -10,7 +10,9 @@ provider:
   timeout: 30
   environment:
     AWS_DYNAMODB_TABLE_NAME: FaceShareData
+    DYNAMODB_TABLE: FaceShareData
     REKOGNITION_COLLECTION_ID: faceshare-collection
+    REKOGNITION_COLLECTION: faceshare-collection
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME, 'faceshare-events'}
     SQS_QUEUE_URL: !Ref PhotoProcessingQueue
     SECRET_KEY: ${env:SECRET_KEY}
@@ -54,6 +56,10 @@ provider:
             - sqs:DeleteMessage
             - sqs:GetQueueAttributes
           Resource: !GetAtt PhotoProcessingQueue.Arn
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+          Resource: "arn:aws:ssm:${self:provider.region}:*:parameter/faceshare/*"
 
 plugins:
   - serverless-python-requirements
@@ -63,24 +69,31 @@ custom:
   pythonRequirements:
     pythonBin: python
     dockerizePip: false
-    slim: true
+    slim: false
     fileName: ../backend/requirements.txt
 
 package:
   individually: false
-  exclude:
-    - node_modules/**
-    - .git/**
-    - .gitignore
-    - README.md
-    - backend/venv/**
-    - backend/dataset/**
-    - backend/event_uploads/**
+  patterns:
+    - '!node_modules/**'
+    - '!.git/**'
+    - '!.gitignore'
+    - '!README.md'
+    - '!package.json'
+    - '!package-lock.json'
+    - '!handler.py'
+    - '!cors.json'
+    - '!lifecycle.json'
+    - '!**/__pycache__/**'
+    - '!**/*.pyc'
+    - '!venv/**'
+    - '!tests/**'
 
 functions:
   # FastAPI backend (all REST API routes)
+  # lambda_handler.py and app/ are copied from ../backend/ by CI before deploy
   api:
-    handler: ../backend/lambda_handler.handler
+    handler: lambda_handler.handler
     memorySize: 256
     timeout: 30
     events:
@@ -112,6 +125,7 @@ functions:
           event: s3:ObjectCreated:*
           rules:
             - prefix: events/
+          existing: true
 
   # Worker: Process photos from queue
   processPhoto:
@@ -122,7 +136,6 @@ functions:
       - sqs:
           arn: !GetAtt PhotoProcessingQueue.Arn
           batchSize: 10
-          maximumBatchingWindowInSeconds: 5
 
 resources:
   Resources:

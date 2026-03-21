@@ -105,13 +105,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Serverless dependencies
-        run: npm install && chmod +x node_modules/.bin/serverless
+      - name: Install Serverless Framework
+        run: npm install -g serverless@3.38.0
+
+      - name: Install Serverless plugins
+        run: npm cache clean --force && npm install
         working-directory: infrastructure
+
+      - name: Copy backend source into infrastructure for packaging
+        run: |
+          cp backend/lambda_handler.py infrastructure/
+          cp -r backend/app infrastructure/
 
       - name: Deploy
         # Reference $SERVERLESS_STAGE as a shell variable (not ${{ }}) to prevent script injection
-        run: node_modules/.bin/serverless deploy --stage "$SERVERLESS_STAGE"
+        run: serverless deploy --stage "$SERVERLESS_STAGE"
         working-directory: infrastructure
         env:
           SERVERLESS_STAGE: ${{ env.STAGE }}
@@ -133,9 +141,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: amondnet/vercel-action@v25
+      - uses: actions/setup-node@v4
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: "--prod"
+          node-version: "20"
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy to Vercel
+        run: vercel deploy --prod --token "$VERCEL_TOKEN" --yes
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

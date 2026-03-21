@@ -21,7 +21,7 @@ QUEUE_URL = os.environ['SQS_QUEUE_URL']
 
 def lambda_handler(event, context):
     """
-    Index a face from S3 image into Rekognition collection.
+    Index face from S3 image into Rekognition collection.
     
     Expected event:
     {
