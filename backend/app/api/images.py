@@ -1,6 +1,9 @@
 import logging
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+import base64
+import json
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from typing import Optional
 from app.schemas.image import (
     PresignedUploadRequest, PresignedUploadResponse,
     PresignedDownloadRequest, PresignedDownloadResponse,
@@ -142,7 +145,7 @@ async def _backfill_face_profile_for_events(user_id: str) -> None:
                 matches = rekognition_service.search_faces_by_image(
                     s3_bucket=settings.S3_BUCKET_NAME,
                     s3_key=photo['s3_key'],
-                    threshold=80.0,
+                    threshold=settings.REKOGNITION_FACE_MATCH_THRESHOLD,
                 )
             except Exception as e:
                 logger.warning("[backfill-face] Rekognition failed for photo %s: %s", photo_id, e)
@@ -256,8 +259,13 @@ async def confirm_face_profile_upload(
     )
 
 
-@router.get("/events/{event_id}/photos", response_model=list[PhotoResponse])
-async def get_event_photos(event_id: str, current_user=Depends(get_current_user)):
+@router.get("/events/{event_id}/photos")
+async def get_event_photos(
+    event_id: str,
+    limit: int = Query(default=100, ge=1, le=200),
+    cursor: Optional[str] = Query(default=None),
+    current_user=Depends(get_current_user),
+):
     """
     List photos for an event.
     - Owner: sees ALL photos (including processing and unmatched)
@@ -273,7 +281,10 @@ async def get_event_photos(event_id: str, current_user=Depends(get_current_user)
     if not participant and not is_owner:
         raise HTTPException(status_code=403, detail="Not a participant of this event")
 
-    photos_raw = dynamodb_service.get_event_photos_sorted(event_id)
+    last_key = json.loads(base64.b64decode(cursor).decode()) if cursor else None
+    photos_raw, next_key = dynamodb_service.get_event_photos_page(event_id, limit, last_key)
+    next_cursor = base64.b64encode(json.dumps(next_key).encode()).decode() if next_key else None
+
     result = []
     for photo in photos_raw:
         photo_id = photo.get('photo_id', '')
@@ -303,7 +314,7 @@ async def get_event_photos(event_id: str, current_user=Depends(get_current_user)
             uploaded_at=photo.get('uploaded_at'),
             match_count=match_count,
         ))
-    return result
+    return {"items": result, "next_cursor": next_cursor}
 
 
 @router.get("/events/{event_id}/photos/{photo_id}/matches", response_model=list[FaceMatchResponse])
@@ -375,7 +386,7 @@ async def process_event_photo(
         matches = rekognition_service.search_faces_by_image(
             s3_bucket=settings.S3_BUCKET_NAME,
             s3_key=s3_key,
-            threshold=80.0,
+            threshold=settings.REKOGNITION_FACE_MATCH_THRESHOLD,
         )
     except Exception as e:
         logger.warning("[process-photo] Rekognition search failed: %s -- marking as processed with 0 matches", e)

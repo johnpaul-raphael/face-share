@@ -1,7 +1,10 @@
 import secrets
 import string
 import logging
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+import base64
+import json
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from typing import Optional
 from uuid import uuid4
 from datetime import datetime, timezone
 
@@ -48,7 +51,7 @@ async def _backfill_new_participant(event_id: str, user_id: str) -> None:
             matches = rekognition_service.search_faces_by_image(
                 s3_bucket=settings.S3_BUCKET_NAME,
                 s3_key=photo['s3_key'],
-                threshold=80.0,
+                threshold=settings.REKOGNITION_FACE_MATCH_THRESHOLD,
             )
         except Exception as e:
             logger.warning("[backfill] Rekognition search failed for photo %s: %s", photo_id, e)
@@ -144,13 +147,17 @@ async def create_event(
     return _event_item_to_response(event, participant_count=1)
 
 
-@router.get("", response_model=list[EventResponse])
-async def list_events(current_user=Depends(get_current_user)):
+@router.get("")
+async def list_events(
+    limit: int = Query(default=50, ge=1, le=100),
+    cursor: Optional[str] = Query(default=None),
+    current_user=Depends(get_current_user),
+):
+    # Events are small lists per user — fetch all then paginate in memory
     owned = dynamodb_service.get_user_events(current_user.id)
     joined = dynamodb_service.get_events_user_joined(current_user.id)
 
-    # Deduplicate (owner is also a participant record)
-    seen = set()
+    seen: set = set()
     all_events = []
     for ev in owned + joined:
         eid = ev.get('event_id')
@@ -158,11 +165,22 @@ async def list_events(current_user=Depends(get_current_user)):
             seen.add(eid)
             all_events.append(ev)
 
+    # Apply cursor (event_id offset) and limit
+    start = 0
+    if cursor:
+        decoded = base64.b64decode(cursor.encode()).decode()
+        ids = [ev.get('event_id') for ev in all_events]
+        start = ids.index(decoded) + 1 if decoded in ids else 0
+
+    page = all_events[start:start + limit]
+    last = page[-1].get('event_id') if len(page) == limit and start + limit < len(all_events) else None
+    next_cursor = base64.b64encode(last.encode()).decode() if last else None
+
     result = []
-    for ev in all_events:
+    for ev in page:
         participants = dynamodb_service.get_event_participants(ev['event_id'])
         result.append(_event_item_to_response(ev, participant_count=len(participants)))
-    return result
+    return {"items": result, "next_cursor": next_cursor}
 
 
 @router.get("/{event_id}", response_model=EventDetailResponse)

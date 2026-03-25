@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from app.schemas.user import UserResponse, UserUpdate, FaceProfileResponse, FaceProfileImageResponse
 from app.api.deps import get_current_user
 from app.core.dynamodb import dynamodb_service
@@ -76,6 +76,31 @@ async def delete_face_profile_image(image_id: str, current_user=Depends(get_curr
         delete_s3_object(s3_key)
 
     dynamodb_service.delete_face_profile(current_user.id, image_id)
+
+
+@router.delete("/me", status_code=204)
+async def delete_account(background_tasks: BackgroundTasks, current_user=Depends(get_current_user)):
+    """Permanently delete the current user's account and all associated data (GDPR)."""
+    user_id = current_user.id
+
+    # 1. Delete face profiles — Rekognition, S3, DynamoDB
+    face_profiles = dynamodb_service.get_user_face_profiles(user_id)
+    for fp in face_profiles:
+        rekognition_face_id = fp.get('rekognition_face_id')
+        if rekognition_face_id:
+            rekognition_service.delete_face(rekognition_face_id)
+        s3_key = fp.get('s3_key')
+        if s3_key:
+            background_tasks.add_task(delete_s3_object, s3_key)
+        dynamodb_service.delete_face_profile(user_id, fp['image_id'])
+
+    # 2. Remove participations from all joined events
+    joined_events = dynamodb_service.get_events_user_joined(user_id)
+    for event in joined_events:
+        dynamodb_service.delete_participant(event['event_id'], user_id)
+
+    # 3. Delete user record
+    dynamodb_service.delete_user(user_id)
 
 
 @router.get("/me/photos")

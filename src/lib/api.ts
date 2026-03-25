@@ -95,11 +95,17 @@ export class ApiClient {
       const error: ApiError = await response.json().catch(() => ({
         detail: `HTTP ${response.status}: ${response.statusText}`,
       }));
-      throw new Error(error.detail || 'An error occurred');
+      throw new Error(this.sanitizeError(error.detail || 'An error occurred'));
     }
 
     if (response.status === 204) return undefined as T;
     return response.json();
+  }
+
+  private sanitizeError(message: string): string {
+    const internalPatterns = [/arn:aws/i, /DynamoDB/i, /Parameter store/i, /NoSuchKey/i, /FaceShareData/i];
+    if (internalPatterns.some(p => p.test(message))) return 'Something went wrong. Please try again.';
+    return message;
   }
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
@@ -162,7 +168,8 @@ export class ApiClient {
   }
 
   async listEvents(): Promise<EventResponse[]> {
-    return this.request<EventResponse[]>('/events');
+    const res = await this.request<{ items: EventResponse[]; next_cursor: string | null }>('/events');
+    return res.items;
   }
 
   async getEvent(eventId: string): Promise<EventDetailResponse> {
@@ -187,7 +194,8 @@ export class ApiClient {
   // ─── Participants ──────────────────────────────────────────────────────────
 
   async listParticipants(eventId: string): Promise<ParticipantResponse[]> {
-    return this.request<ParticipantResponse[]>(`/events/${eventId}/participants`);
+    const res = await this.request<{ items: ParticipantResponse[]; next_cursor: string | null }>(`/events/${eventId}/participants`);
+    return res.items;
   }
 
   async approveParticipant(eventId: string, userId: string) {
@@ -275,7 +283,8 @@ export class ApiClient {
   }
 
   async getEventPhotos(eventId: string): Promise<PhotoResponse[]> {
-    return this.request<PhotoResponse[]>(`/events/${eventId}/photos`);
+    const res = await this.request<{ items: PhotoResponse[]; next_cursor: string | null }>(`/events/${eventId}/photos`);
+    return res.items;
   }
 
   async processPhoto(eventId: string, photoId: string): Promise<{ processed: boolean; matches_found: number }> {

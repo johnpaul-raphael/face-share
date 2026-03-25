@@ -7,7 +7,7 @@ Handles all DynamoDB operations with proper error handling and logging.
 import logging
 import boto3
 from botocore.exceptions import ClientError
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from decimal import Decimal
 from datetime import datetime, timezone
 
@@ -242,6 +242,22 @@ class DynamoDBService:
             logger.error("[db] Error adding participant: %s", e)
             return False
 
+    def get_event_participants_page(self, event_id: str, limit: int, last_key: Optional[Dict]) -> Tuple[List[Dict], Optional[Dict]]:
+        """Paginated fetch of event participants. Returns (items, next_last_key)."""
+        try:
+            params: Dict = {
+                'KeyConditionExpression': 'PK = :pk AND begins_with(SK, :sk)',
+                'ExpressionAttributeValues': {':pk': f'EVENT#{event_id}', ':sk': 'USER#'},
+                'Limit': limit,
+            }
+            if last_key:
+                params['ExclusiveStartKey'] = last_key
+            response = self.table.query(**params)
+            return response.get('Items', []), response.get('LastEvaluatedKey')
+        except ClientError as e:
+            logger.error("[db] Error paginating participants: %s", e)
+            return [], None
+
     def get_event_participants(self, event_id: str) -> List[Dict]:
         """Get all participants for an event."""
         try:
@@ -290,6 +306,22 @@ class DynamoDBService:
         except ClientError as e:
             logger.error("[db] Error creating photo: %s", e)
             return False
+
+    def get_event_photos_page(self, event_id: str, limit: int, last_key: Optional[Dict]) -> Tuple[List[Dict], Optional[Dict]]:
+        """Paginated fetch of event photos. Returns (items, next_last_key)."""
+        try:
+            params: Dict = {
+                'KeyConditionExpression': 'PK = :pk AND begins_with(SK, :sk)',
+                'ExpressionAttributeValues': {':pk': f'EVENT#{event_id}', ':sk': 'PHOTO#'},
+                'Limit': limit,
+            }
+            if last_key:
+                params['ExclusiveStartKey'] = last_key
+            response = self.table.query(**params)
+            return response.get('Items', []), response.get('LastEvaluatedKey')
+        except ClientError as e:
+            logger.error("[db] Error paginating photos: %s", e)
+            return [], None
 
     def get_event_photos(self, event_id: str) -> List[Dict]:
         """Get all photos for an event."""
@@ -433,6 +465,15 @@ class DynamoDBService:
             return True
         except ClientError as e:
             logger.error("[db] Error updating user: %s", e)
+            return False
+
+    def delete_user(self, user_id: str) -> bool:
+        """Delete the user PROFILE record."""
+        try:
+            self.table.delete_item(Key={'PK': f'USER#{user_id}', 'SK': 'PROFILE'})
+            return True
+        except ClientError as e:
+            logger.error("[db] Error deleting user %s: %s", user_id, e)
             return False
 
     # ==========================================

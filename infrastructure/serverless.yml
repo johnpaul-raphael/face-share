@@ -8,6 +8,10 @@ provider:
   region: ${opt:region, 'us-east-1'}
   memorySize: 128
   timeout: 30
+  httpApi:
+    throttle:
+      rateLimit: 100
+      burstLimit: 200
   environment:
     AWS_DYNAMODB_TABLE_NAME: FaceShareData
     DYNAMODB_TABLE: FaceShareData
@@ -17,7 +21,7 @@ provider:
     SQS_QUEUE_URL: !Ref PhotoProcessingQueue
     SECRET_KEY: ${env:SECRET_KEY}
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
-    CORS_ORIGINS: ${env:CORS_ORIGINS, '*'}
+    CORS_ORIGINS: ${env:CORS_ORIGINS}
     ENVIRONMENT: production
 
   iam:

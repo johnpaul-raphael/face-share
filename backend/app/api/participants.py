@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+import base64
+import json
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 from app.api.deps import get_current_user
 from app.core.dynamodb import dynamodb_service
 from app.schemas.event import EventParticipantResponse, ParticipationStatus
@@ -6,8 +9,13 @@ from app.schemas.event import EventParticipantResponse, ParticipationStatus
 router = APIRouter()
 
 
-@router.get("/events/{event_id}/participants", response_model=list[EventParticipantResponse])
-async def list_participants(event_id: str, current_user=Depends(get_current_user)):
+@router.get("/events/{event_id}/participants")
+async def list_participants(
+    event_id: str,
+    limit: int = Query(default=100, ge=1, le=200),
+    cursor: Optional[str] = Query(default=None),
+    current_user=Depends(get_current_user),
+):
     event = dynamodb_service.get_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -16,8 +24,11 @@ async def list_participants(event_id: str, current_user=Depends(get_current_user
     if not participant and event.get('owner_id') != current_user.id:
         raise HTTPException(status_code=403, detail="Not a participant of this event")
 
-    participants_raw = dynamodb_service.get_event_participants(event_id)
-    return [
+    last_key = json.loads(base64.b64decode(cursor).decode()) if cursor else None
+    participants_raw, next_key = dynamodb_service.get_event_participants_page(event_id, limit, last_key)
+    next_cursor = base64.b64encode(json.dumps(next_key).encode()).decode() if next_key else None
+
+    items = [
         EventParticipantResponse(
             user_id=p['user_id'],
             user_name=p.get('user_name', ''),
@@ -29,6 +40,7 @@ async def list_participants(event_id: str, current_user=Depends(get_current_user
         )
         for p in participants_raw
     ]
+    return {"items": items, "next_cursor": next_cursor}
 
 
 @router.patch("/events/{event_id}/participants/{user_id}/approve", response_model=EventParticipantResponse)

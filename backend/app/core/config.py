@@ -119,6 +119,15 @@ class Settings(BaseSettings):
     REKOGNITION_COLLECTION_ID: str = "faceshare-collection"
     """AWS Rekognition face collection ID"""
 
+    REKOGNITION_FACE_MATCH_THRESHOLD: float = 80.0
+    """Minimum similarity score (0-100) to consider a face match valid"""
+
+    REKOGNITION_CONNECT_TIMEOUT: int = 5
+    """Boto3 connect timeout in seconds for Rekognition calls"""
+
+    REKOGNITION_READ_TIMEOUT: int = 30
+    """Boto3 read timeout in seconds for Rekognition calls"""
+
     # ==========================================
     # GOOGLE SSO
     # ==========================================
