@@ -11,10 +11,10 @@ class TestListParticipants:
         second = {**FAKE_PARTICIPANT, "user_id": "user-other", "user_name": "Other"}
         with patch("app.api.participants.dynamodb_service") as mock_db:
             mock_db.get_event.return_value = OWNER_EVENT
-            mock_db.get_event_participants.return_value = [FAKE_PARTICIPANT, second]
+            mock_db.get_event_participants_page.return_value = ([FAKE_PARTICIPANT, second], None)
             resp = client.get(BASE)
         assert resp.status_code == 200
-        assert len(resp.json()) == 2
+        assert len(resp.json()["items"]) == 2
 
     def test_list_event_not_found(self, client):
         with patch("app.api.participants.dynamodb_service") as mock_db:

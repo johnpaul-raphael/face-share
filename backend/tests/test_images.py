@@ -100,10 +100,10 @@ class TestGetEventPhotos:
         with patch("app.api.images.dynamodb_service") as mock_db, \
              patch("app.api.images.generate_presigned_download_url", return_value="https://s3.example.com/photo.jpg"):
             mock_db.get_event.return_value = FAKE_EVENT
-            mock_db.get_event_photos_sorted.return_value = [FAKE_PHOTO]
+            mock_db.get_event_photos_page.return_value = ([FAKE_PHOTO], None)
             resp = client.get(f"/api/v1/events/{EVENT_ID}/photos")
         assert resp.status_code == 200
-        photos = resp.json()
+        photos = resp.json()["items"]
         assert len(photos) == 1
         assert photos[0]["photo_id"] == "photo-111"
         assert photos[0]["url"] == "https://s3.example.com/photo.jpg"

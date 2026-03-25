@@ -40,7 +40,7 @@ class TestListEvents:
             mock_db.get_event_participants.return_value = [FAKE_PARTICIPANT]
             resp = client.get(BASE)
         assert resp.status_code == 200
-        events = resp.json()
+        events = resp.json()["items"]
         assert isinstance(events, list)
         assert events[0]["id"] == FAKE_EVENT["event_id"]
 
@@ -52,7 +52,7 @@ class TestListEvents:
             mock_db.get_event_participants.return_value = []
             resp = client.get(BASE)
         assert resp.status_code == 200
-        assert len(resp.json()) == 1
+        assert len(resp.json()["items"]) == 1
 
     def test_list_events_empty(self, client):
         with patch("app.api.events.dynamodb_service") as mock_db:
@@ -60,7 +60,7 @@ class TestListEvents:
             mock_db.get_events_user_joined.return_value = []
             resp = client.get(BASE)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.json()["items"] == []
 
 
 class TestGetEvent:
