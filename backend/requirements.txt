@@ -11,3 +11,6 @@ mangum>=0.17.0
 Pillow>=10.0.0
 google-auth
 requests
+
+pytest
+httpx
