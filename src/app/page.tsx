@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import {
@@ -47,6 +49,13 @@ const USE_CASES = [
 
 /* ── Component ─────────────────────────────────────────────────────────── */
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) router.replace('/dashboard');
+  }, [router]);
+
   return (
     <div
       className="min-h-screen overflow-x-hidden"

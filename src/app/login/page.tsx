@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
@@ -18,6 +19,11 @@ const PERKS = [
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) router.replace('/dashboard');
+  }, [router]);
 
   return (
     <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
