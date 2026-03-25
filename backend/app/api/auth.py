@@ -69,7 +69,8 @@ async def google_login(request: GoogleLoginRequest):
             settings.GOOGLE_CLIENT_ID,
         )
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid Google token: {e}")
+        logger.warning("Google token verification failed: %s", e)
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
     email = idinfo["email"]
     name = idinfo.get("name", email.split("@")[0])

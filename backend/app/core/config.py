@@ -160,6 +160,21 @@ class Settings(BaseSettings):
     # VALIDATORS
     # ==========================================
     @model_validator(mode='after')
+    def validate_secret_key(self):
+        """Reject the placeholder SECRET_KEY that ships as the default."""
+        if self.SECRET_KEY in ("change-this-in-production", "", None):
+            raise ValueError(
+                "SECRET_KEY must be set to a strong random value. "
+                "Generate one with: openssl rand -hex 32"
+            )
+        if len(self.SECRET_KEY) < 32:
+            raise ValueError(
+                "SECRET_KEY is too short — use at least 32 characters. "
+                "Generate one with: openssl rand -hex 32"
+            )
+        return self
+
+    @model_validator(mode='after')
     def parse_cors_origins(self):
         """
         Convert CORS_ORIGINS from string to list.

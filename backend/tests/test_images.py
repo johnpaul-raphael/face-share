@@ -44,7 +44,10 @@ class TestPresignedUpload:
 
 class TestPresignedDownload:
     def test_presigned_download_success(self, client):
-        with patch("app.api.images.generate_presigned_download_url", return_value="https://s3.example.com/download"):
+        with patch("app.api.images.dynamodb_service") as mock_db, \
+             patch("app.api.images.generate_presigned_download_url", return_value="https://s3.example.com/download"):
+            mock_db.get_event.return_value = FAKE_EVENT          # event exists
+            mock_db.get_participant.return_value = {"user_id": FAKE_USER["id"]}  # current user is participant
             resp = client.post(f"{PRESIGNED_BASE}/presigned-download", json={
                 "s3_key": "events/event-xyz-456/photos/photo-001.jpg"
             })

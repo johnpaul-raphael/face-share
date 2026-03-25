@@ -28,6 +28,7 @@ class TestUpdateProfile:
     def test_update_email_success(self, client):
         updated_item = {**FAKE_USER_ITEM, "email": "new@example.com"}
         with patch("app.api.users.dynamodb_service") as mock_db:
+            mock_db.get_user_by_email.return_value = None  # email not taken
             mock_db.update_user.return_value = True
             mock_db.get_user_by_id.return_value = updated_item
             resp = client.patch(f"{BASE}/me", json={"email": "new@example.com"})

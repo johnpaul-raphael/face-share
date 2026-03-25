@@ -85,11 +85,12 @@ async def get_presigned_upload_url(
         )
 
     else:
-        # Face profile image upload
-        user_id = request.user_id or current_user.id
-        face_image_id = request.face_image_id or str(uuid4())
-        if user_id != current_user.id:
+        # Face profile image upload — server always owns ID generation
+        if request.user_id and request.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="You can only upload face profile images for yourself")
+        user_id = current_user.id
+        # Always generate server-side; never trust a client-supplied face_image_id
+        face_image_id = str(uuid4())
         s3_key = get_s3_key_for_face_profile(user_id, face_image_id, request.filename)
         upload_url = generate_presigned_upload_url(key=s3_key, content_type=request.content_type)
         if not upload_url:
@@ -105,9 +106,36 @@ async def get_presigned_upload_url(
 @router.post("/presigned-download", response_model=PresignedDownloadResponse)
 async def get_presigned_download_url_endpoint(
     request: PresignedDownloadRequest,
-    _current_user=Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    download_url = generate_presigned_download_url(key=request.s3_key)
+    s3_key = request.s3_key
+    parts = s3_key.lstrip('/').split('/')
+
+    # ── Own face profile: users/{user_id}/face-profile/... ───────────────────
+    if parts[0] == 'users':
+        if len(parts) < 3 or parts[1] != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # ── Event photo or thumbnail: (thumbs/)events/{event_id}/photos/... ──────
+    elif parts[0] in ('events', 'thumbs'):
+        # thumbs/ prefix: thumbs/events/{event_id}/photos/...
+        event_parts = parts[1:] if parts[0] == 'thumbs' else parts
+        if len(event_parts) < 3 or event_parts[0] != 'events':
+            raise HTTPException(status_code=403, detail="Access denied")
+        event_id = event_parts[1]
+        event = dynamodb_service.get_event(event_id)
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        is_owner = event.get('owner_id') == current_user.id
+        participant = dynamodb_service.get_participant(event_id, current_user.id)
+        if not is_owner and not participant:
+            raise HTTPException(status_code=403, detail="Not a participant of this event")
+
+    # ── Any other key pattern is rejected ────────────────────────────────────
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    download_url = generate_presigned_download_url(key=s3_key)
     if not download_url:
         raise HTTPException(status_code=500, detail="Failed to generate presigned URL")
     return PresignedDownloadResponse(
@@ -158,6 +186,7 @@ async def _backfill_face_profile_for_events(user_id: str) -> None:
                         match_id=match_id,
                         photo_id=photo_id,
                         user_id=user_id,
+                        event_id=event_id,
                         confidence=m['similarity'],
                         created_at=now,
                     )
@@ -414,6 +443,7 @@ async def process_event_photo(
                 match_id=match_id,
                 photo_id=photo_id,
                 user_id=user_id,
+                event_id=event_id,
                 confidence=similarity,
                 created_at=now,
             )

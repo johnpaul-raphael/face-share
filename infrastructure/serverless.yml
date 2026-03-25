@@ -17,6 +17,7 @@ provider:
     DYNAMODB_TABLE: FaceShareData
     REKOGNITION_COLLECTION_ID: faceshare-collection
     REKOGNITION_COLLECTION: faceshare-collection
+    FACE_MATCH_THRESHOLD: "80.0"
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME, 'faceshare-events'}
     SQS_QUEUE_URL: !Ref PhotoProcessingQueue
     SECRET_KEY: ${env:SECRET_KEY}

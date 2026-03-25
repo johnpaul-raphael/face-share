@@ -34,6 +34,7 @@ Example Usage:
 
 import logging
 import os
+import re
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -285,14 +286,25 @@ def tag_s3_objects_for_deletion(keys: list[str]) -> None:
 # S3 KEY GENERATORS
 # ==========================================
 
+def _sanitize_filename(filename: str) -> str:
+    """Strip path traversal characters; keep only safe filename chars."""
+    # Keep alphanumeric, dot, hyphen, underscore — drop everything else
+    safe = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
+    # Collapse consecutive dots to prevent traversal like ../../
+    safe = re.sub(r'\.{2,}', '.', safe)
+    # Trim leading dots/underscores and enforce a max length
+    safe = safe.lstrip('.').strip('_')[:200]
+    return safe or 'image'
+
+
 def get_s3_key_for_photo(event_id: str, photo_id: str, filename: str) -> str:
     """Generate S3 key (path) for an event photo."""
-    return f"events/{event_id}/photos/{photo_id}/{filename}"
+    return f"events/{event_id}/photos/{photo_id}/{_sanitize_filename(filename)}"
 
 
 def get_s3_key_for_face_profile(user_id: str, face_image_id: str, filename: str) -> str:
     """Generate S3 key (path) for a user's face profile image."""
-    return f"users/{user_id}/face-profile/{face_image_id}/{filename}"
+    return f"users/{user_id}/face-profile/{face_image_id}/{_sanitize_filename(filename)}"
 
 
 def get_s3_key_for_face_crop(photo_id: str, match_id: str) -> str:

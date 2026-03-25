@@ -28,6 +28,10 @@ async def get_me(current_user=Depends(get_current_user)):
 @router.patch("/me", response_model=UserResponse)
 async def update_me(user_update: UserUpdate, current_user=Depends(get_current_user)):
     updates = user_update.model_dump(exclude_none=True)
+    if 'email' in updates and updates['email'] != current_user.email:
+        existing = dynamodb_service.get_user_by_email(updates['email'])
+        if existing:
+            raise HTTPException(status_code=409, detail="Email already in use")
     if updates:
         dynamodb_service.update_user(current_user.id, **updates)
     updated_item = dynamodb_service.get_user_by_id(current_user.id)
@@ -108,13 +112,26 @@ async def get_my_photos(current_user=Depends(get_current_user)):
     """Return all photos where the current user appears, grouped by event."""
     match_records = dynamodb_service.get_user_photos_with_details(current_user.id)
 
-    # Fetch photo details for each match and generate download URLs
+    # Discard matches without event_id (legacy records before the fix)
+    valid_matches = [m for m in match_records if m.get('photo_id') and m.get('event_id')]
+    if not valid_matches:
+        return []
+
+    # Fetch unique events in one pass to avoid N+1
+    unique_event_ids = {m['event_id'] for m in valid_matches}
+    events_by_id = {}
+    for eid in unique_event_ids:
+        ev = dynamodb_service.get_event(eid)
+        if ev:
+            events_by_id[eid] = ev
+
     photos_by_event: dict = {}
-    for match in match_records:
-        photo_id = match.get('photo_id')
-        event_id = match.get('event_id')
-        if not photo_id or not event_id:
-            continue
+    for match in valid_matches:
+        photo_id = match['photo_id']
+        event_id = match['event_id']
+
+        if event_id not in events_by_id:
+            continue  # event deleted
 
         photo = dynamodb_service.get_photo(event_id, photo_id)
         if not photo:
@@ -136,10 +153,10 @@ async def get_my_photos(current_user=Depends(get_current_user)):
         }
 
         if event_id not in photos_by_event:
-            event = dynamodb_service.get_event(event_id)
+            ev = events_by_id[event_id]
             photos_by_event[event_id] = {
                 'event_id': event_id,
-                'event_name': event.get('name', '') if event else '',
+                'event_name': ev.get('name', ''),
                 'photos': [],
             }
         photos_by_event[event_id]['photos'].append(photo_entry)

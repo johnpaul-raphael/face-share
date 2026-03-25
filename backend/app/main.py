@@ -15,18 +15,21 @@ app = FastAPI(
 
 
 def _cors_headers_for_request(request: Request) -> dict:
-    """Build CORS headers so error responses (e.g. 500) are not blocked by the browser."""
-    origin = request.headers.get("origin", "*")
-    return {"Access-Control-Allow-Origin": origin}
+    """Build CORS headers for error responses, only for allowed origins."""
+    origin = request.headers.get("origin", "")
+    allowed: list = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+    if origin and (origin in allowed or "*" in allowed):
+        return {"Access-Control-Allow-Origin": origin}
+    return {}
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Ensure 500 responses include CORS headers so the frontend sees the real error."""
-    logger.error("500 ERROR  %s %s", request.method, request.url, exc_info=True)
+    logger.error("500 ERROR  %s %s: %s", request.method, request.url, exc, exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc) or "Internal server error"},
+        content={"detail": "Internal server error"},
         headers=_cors_headers_for_request(request),
     )
 

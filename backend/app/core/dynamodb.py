@@ -281,7 +281,7 @@ class DynamoDBService:
                      s3_key: str, **kwargs) -> bool:
         """Create a photo record."""
         try:
-            uploaded_at = kwargs.get('uploaded_at', datetime.utcnow().isoformat())
+            uploaded_at = kwargs.get('uploaded_at', datetime.now(timezone.utc).isoformat())
             item = {
                 'PK': f'EVENT#{event_id}',
                 'SK': f'PHOTO#{photo_id}',

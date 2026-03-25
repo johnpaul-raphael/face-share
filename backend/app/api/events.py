@@ -63,6 +63,7 @@ async def _backfill_new_participant(event_id: str, user_id: str) -> None:
                     match_id=match_id,
                     photo_id=photo_id,
                     user_id=user_id,
+                    event_id=event_id,
                     confidence=m['similarity'],
                     created_at=now,
                 )
