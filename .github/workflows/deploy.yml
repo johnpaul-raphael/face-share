@@ -46,7 +46,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt flake8
+        run: pip install -r backend/requirements-dev.txt flake8
 
       - name: Lint
         run: flake8 backend/app/ --max-line-length=120 --extend-ignore=E501,W503
