@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 
 from app.api.deps import get_current_user
 from app.core.dynamodb import dynamodb_service
+from app.core.rekognition import rekognition_service
+from app.core.config import settings
 from app.core.s3 import generate_presigned_download_url, tag_s3_objects_for_deletion
 from app.schemas.event import (
     EventCreate, EventUpdate, EventResponse, EventDetailResponse,
@@ -18,6 +20,55 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _JOIN_CODE_CHARS = string.ascii_uppercase + string.digits
+
+
+async def _backfill_new_participant(event_id: str, user_id: str) -> None:
+    """Re-scan all processed photos in an event for a newly joined user.
+
+    Runs as a background task after join. Uses real Rekognition calls so we
+    get accurate confidence scores (unlike the old raw_matched_user_ids path
+    which stored 0.0).
+    """
+    photos = dynamodb_service.get_event_photos(event_id)
+    processed = [p for p in photos if not p.get('is_processing', True) and p.get('s3_key')]
+    if not processed:
+        return
+
+    now = datetime.now(timezone.utc).isoformat()
+    matched = 0
+    for photo in processed:
+        photo_id = photo['photo_id']
+
+        # Skip if we already have a match record for this user on this photo
+        existing = dynamodb_service.get_photo_matches(photo_id)
+        if any(m.get('user_id') == user_id for m in existing):
+            continue
+
+        try:
+            matches = rekognition_service.search_faces_by_image(
+                s3_bucket=settings.S3_BUCKET_NAME,
+                s3_key=photo['s3_key'],
+                threshold=80.0,
+            )
+        except Exception as e:
+            logger.warning("[backfill] Rekognition search failed for photo %s: %s", photo_id, e)
+            continue
+
+        for m in matches:
+            if m.get('external_image_id') == user_id:
+                match_id = str(uuid4())
+                dynamodb_service.create_face_match(
+                    match_id=match_id,
+                    photo_id=photo_id,
+                    user_id=user_id,
+                    confidence=m['similarity'],
+                    created_at=now,
+                )
+                dynamodb_service.increment_photo_match_count(event_id, photo_id)
+                matched += 1
+                break
+
+    logger.info("[backfill] Backfilled %d photo(s) for user %s in event %s", matched, user_id, event_id)
 
 
 def _generate_join_code(length: int = 6) -> str:
@@ -196,6 +247,7 @@ async def delete_event(event_id: str, background_tasks: BackgroundTasks, current
 @router.post("/join", response_model=EventJoinResponse)
 async def join_event(
     join_request: EventJoinRequest,
+    background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user),
 ):
     event = dynamodb_service.get_event_by_join_code(join_request.join_code.upper().strip())
@@ -217,30 +269,9 @@ async def join_event(
         joined_at=now,
     )
 
-    # Backfill face matches from already-processed photos using stored raw Rekognition results.
-    # This means zero extra Rekognition API calls for late joiners.
-    all_photos = dynamodb_service.get_event_photos(event_id)
-    backfilled = 0
-    for photo in all_photos:
-        raw_matched = photo.get('raw_matched_user_ids', [])
-        if current_user.id in raw_matched:
-            photo_id = photo['photo_id']
-            # Check we don't create a duplicate match
-            existing_matches = dynamodb_service.get_photo_matches(photo_id)
-            already_matched = any(m.get('user_id') == current_user.id for m in existing_matches)
-            if not already_matched:
-                match_id = str(uuid4())
-                dynamodb_service.create_face_match(
-                    match_id=match_id,
-                    photo_id=photo_id,
-                    user_id=current_user.id,
-                    confidence=0.0,  # Original similarity not stored per-user; 0 signals backfill
-                    created_at=now,
-                )
-                backfilled += 1
-
-    if backfilled:
-        logger.info("[join-event] Backfilled %d photo matches for late joiner %s", backfilled, current_user.id)
+    # Re-scan existing processed photos in the background with real Rekognition calls.
+    # This handles the case where photos were uploaded before this user joined.
+    background_tasks.add_task(_backfill_new_participant, event_id, current_user.id)
 
     participants = dynamodb_service.get_event_participants(event_id)
     event_response = _event_item_to_response(event, participant_count=len(participants))

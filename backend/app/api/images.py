@@ -1,6 +1,6 @@
 import logging
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from app.schemas.image import (
     PresignedUploadRequest, PresignedUploadResponse,
     PresignedDownloadRequest, PresignedDownloadResponse,
@@ -113,10 +113,64 @@ async def get_presigned_download_url_endpoint(
     )
 
 
+async def _backfill_face_profile_for_events(user_id: str) -> None:
+    """After a user indexes their face, re-scan photos in all events they've joined.
+
+    Runs as a background task. Complements _backfill_new_participant in events.py:
+    that covers joining after photos exist; this covers setting up face profile
+    after already being a participant.
+    """
+    events = dynamodb_service.get_events_user_joined(user_id)
+    if not events:
+        return
+
+    now = datetime.now(timezone.utc).isoformat()
+    for event in events:
+        event_id = event['event_id']
+        photos = dynamodb_service.get_event_photos(event_id)
+        processed = [p for p in photos if not p.get('is_processing', True) and p.get('s3_key')]
+
+        matched = 0
+        for photo in processed:
+            photo_id = photo['photo_id']
+
+            existing = dynamodb_service.get_photo_matches(photo_id)
+            if any(m.get('user_id') == user_id for m in existing):
+                continue
+
+            try:
+                matches = rekognition_service.search_faces_by_image(
+                    s3_bucket=settings.S3_BUCKET_NAME,
+                    s3_key=photo['s3_key'],
+                    threshold=80.0,
+                )
+            except Exception as e:
+                logger.warning("[backfill-face] Rekognition failed for photo %s: %s", photo_id, e)
+                continue
+
+            for m in matches:
+                if m.get('external_image_id') == user_id:
+                    match_id = str(uuid4())
+                    dynamodb_service.create_face_match(
+                        match_id=match_id,
+                        photo_id=photo_id,
+                        user_id=user_id,
+                        confidence=m['similarity'],
+                        created_at=now,
+                    )
+                    dynamodb_service.increment_photo_match_count(event_id, photo_id)
+                    matched += 1
+                    break
+
+        if matched:
+            logger.info("[backfill-face] Matched %d photo(s) for user %s in event %s", matched, user_id, event_id)
+
+
 @router.post("/face-profile/confirm-upload", response_model=FaceProfileImageResponse)
 async def confirm_face_profile_upload(
     face_image_id: str,
     s3_key: str,
+    background_tasks: BackgroundTasks,
     description: str = None,
     current_user=Depends(get_current_user),
 ):
@@ -189,6 +243,10 @@ async def confirm_face_profile_upload(
 
     url = generate_presigned_download_url(s3_key)
     logger.info("[confirm-upload] Done - face profile saved for user %s", current_user.id)
+
+    # Re-scan existing event photos for this user now that their face is indexed.
+    background_tasks.add_task(_backfill_face_profile_for_events, current_user.id)
+
     return FaceProfileImageResponse(
         id=face_image_id,
         s3_key=s3_key,
