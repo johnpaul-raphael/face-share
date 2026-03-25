@@ -2,7 +2,6 @@ import secrets
 import string
 import logging
 import base64
-import json
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from typing import Optional
 from uuid import uuid4
